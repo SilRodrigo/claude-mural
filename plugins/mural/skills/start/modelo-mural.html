@@ -1,5 +1,5 @@
 <title>Mural {{PROJETO}}</title>
-<meta name="mural-versao" content="1.2.1">
+<meta name="mural-versao" content="1.2.2">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Fredoka:wght@500;600&family=JetBrains+Mono:wght@400;600&display=swap">
@@ -234,7 +234,8 @@ body.sem-selecao, body.sem-selecao * { user-select: none; -webkit-user-select: n
   user-select: none;
 }
 .card-head:active { cursor: grabbing; }
-.cid { font-family: var(--font-mono); font-weight: 600; font-size: 13px; letter-spacing: 0.02em; }
+.cid { font-family: var(--font-mono); font-weight: 600; font-size: 13px; letter-spacing: 0.02em; cursor: copy; border-radius: 4px; padding: 0 3px; margin: 0 -3px; }
+.cid:hover { background: var(--note-line); }
 .pill {
   font-size: 11px;
   font-weight: 700;
@@ -594,7 +595,7 @@ dialog textarea { min-height: 90px; resize: vertical; }
     </dl>
     <p><b>Esperando você</b> → você responde aqui → <b>Com os agentes</b> → a sessão aplica e escreve uma nota → <b>Aplicado</b>.</p>
     <p>As sessões não recebem aviso quando você responde. Elas leem o mural quando começam a trabalhar. Para chamar uma sessão na hora, use <b>Copiar aviso</b> no card respondido e cole no chat da sessão indicada em "aberto por".</p>
-    <p>Arraste o quadro para mover, use a roda do mouse para o zoom e arraste um card pela faixa do ID. Cada card novo chega na área que a sessão indicou, ou em <b>Entrada</b>.</p>
+    <p>Arraste o quadro para mover, use a roda do mouse para o zoom e arraste um card pela faixa do ID. Um clique no ID copia o ID. Cada card novo chega na área que a sessão indicou, ou em <b>Entrada</b>.</p>
     <p><b>Grampear:</b> solte um card em cima de outro, ou de uma pilha, para grampear os dois. Você também pode marcar a bolinha no canto do card (ou usar Ctrl+clique na faixa do ID) para escolher vários e clicar em <b>Grampear</b>. A pilha pode ganhar um nome, ser aberta para ver todos os cards, arquivada inteira de uma vez ou desgrampeada. Com a pilha aberta, arraste um card para fora dela para tirá-lo, ou solte em cima de outro card da pilha para mudar a ordem.</p>
     <p><b>Tema:</b> o botão "Tema" alterna entre automático (segue o claude.ai), claro e escuro. A escolha fica guardada só neste navegador.</p>
     <div class="dialog-actions"><button class="btn" type="button" id="ajuda-fechar">Fechar</button></div>
@@ -927,6 +928,7 @@ dialog textarea { min-height: 90px; resize: vertical; }
     head.title = "Arraste para mover";
     const cid = document.createElement("span");
     cid.className = "cid";
+    cid.title = "Clique para copiar o ID";
     const pill = document.createElement("span");
     pill.className = "pill";
     const esq = document.createElement("span");
@@ -1031,7 +1033,8 @@ dialog textarea { min-height: 90px; resize: vertical; }
       if (e.ctrlKey || e.metaKey || e.shiftKey) { e.preventDefault(); alternarSelecao(id); return; }
       const gid = grupoDe.get(id);
       const g = gid && estado.grupos.get(gid);
-      arrastar(e, head, g && !g.aberto ? { grupo: gid } : { card: id });
+      const noId = e.target.closest(".cid");
+      arrastar(e, head, g && !g.aberto ? { grupo: gid } : { card: id }, noId ? () => copiarId(id) : null);
     });
 
     const no = { raiz, cid, pill, titulo, ctx, code, opts, itens, ta, respRow, nota, copia, meta, avisar, arq, tirar, selbtn, altura: 0, camada: 0, assinatura: "" };
@@ -1155,6 +1158,15 @@ dialog textarea { min-height: 90px; resize: vertical; }
     const resp = texto(c.resposta);
     const curta = resp.length > 80 ? resp.slice(0, 77) + "…" : resp;
     return `Respondi a ${id} no mural${curta ? ` ("${curta}")` : ""}. Pode aplicar.`;
+  }
+  // Clique (sem arrastar) no ID do card copia o ID.
+  async function copiarId(id) {
+    try {
+      await navigator.clipboard.writeText(id);
+      toast(`${id} copiado.`);
+    } catch (_) {
+      toast(`Não consegui copiar. O ID é ${id}.`);
+    }
   }
   async function copiarAviso(id) {
     const c = estado.cards.get(id);
