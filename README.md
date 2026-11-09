@@ -33,11 +33,6 @@ Atualizar o plugin não muda os murais já publicados. A skill compara a versão
 - As sessões abrem cards e avisam com uma linha no chat ("abri a P-03 no mural").
 - Depois de responder, use **Copiar aviso** no card e cole no chat da sessão.
 
-## Usar o mural de outra pessoa
-1. O dono compartilha a página do mural com você, pelo menu Compartilhar, com acesso de edição.
-2. O dono convida você neste repositório (é privado), e você instala o plugin.
-3. No seu projeto, rode `/mural:start` e cole o link do mural. A sessão guarda o link na memória do projeto.
-
 ## Estrutura
 ```
 .claude-plugin/marketplace.json
