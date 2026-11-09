@@ -40,6 +40,8 @@ Atualizar o plugin não muda os murais já publicados. A skill compara a versão
 - "cria um mural pra este projeto" → a sessão publica o mural e guarda o link na memória do projeto.
 - As sessões abrem cards e avisam com uma linha no chat ("abri a P-03 no mural").
 - Depois de responder, use **Copiar aviso** no card e cole no chat da sessão.
+- Para juntar tópicos já alinhados, **grampeie** os cards: solte um em cima do outro, ou selecione vários (bolinha no card ou Ctrl+clique) e clique em **Grampear**. A pilha pode ganhar um nome e ser arquivada inteira de uma vez.
+- O botão **Tema** no topo troca entre automático (segue o claude.ai), claro e escuro.
 
 ## Estrutura
 ```
