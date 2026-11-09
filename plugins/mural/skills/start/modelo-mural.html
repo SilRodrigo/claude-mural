@@ -1,5 +1,5 @@
 <title>Mural {{PROJETO}}</title>
-<meta name="mural-versao" content="1.1.1">
+<meta name="mural-versao" content="1.2.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Fredoka:wght@500;600&family=JetBrains+Mono:wght@400;600&display=swap">
@@ -27,12 +27,15 @@
   --st-done: #2F7A35;
   --st-arch: #6D7468;
   --shadow: 0 1px 2px rgba(30, 42, 33, 0.18), 0 6px 14px rgba(30, 42, 33, 0.10);
+  --grupo-bg: rgba(30, 42, 33, 0.05);
+  --grupo-line: #9DAE92;
   --font-display: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
   --font-body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", Consolas, "Courier New", monospace;
 }
+/* Tema: segue o claude.ai/sistema, a não ser que o botão "Tema" do mural force claro ou escuro (data-mural-tema). */
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
+  :root:not([data-theme="light"]):not([data-mural-tema="claro"]) {
     color-scheme: dark;
     --canvas: #161E18;
     --dot: #2A372D;
@@ -55,9 +58,11 @@
     --st-done: #86CF8B;
     --st-arch: #9AA295;
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 8px 18px rgba(0, 0, 0, 0.35);
+    --grupo-bg: rgba(255, 255, 255, 0.04);
+    --grupo-line: #4E6155;
   }
 }
-:root[data-theme="dark"] {
+:root[data-theme="dark"]:not([data-mural-tema="claro"]), :root[data-mural-tema="escuro"] {
   color-scheme: dark;
   --canvas: #161E18;
   --dot: #2A372D;
@@ -80,6 +85,8 @@
   --st-done: #86CF8B;
   --st-arch: #9AA295;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 8px 18px rgba(0, 0, 0, 0.35);
+  --grupo-bg: rgba(255, 255, 255, 0.04);
+  --grupo-line: #4E6155;
 }
 
 html, body { height: 100%; }
@@ -173,6 +180,8 @@ button { cursor: pointer; }
   touch-action: none;
 }
 .viewport.panning { cursor: grabbing; }
+/* Enquanto arrasta a tela, um card ou uma pilha, o navegador não seleciona texto. */
+body.sem-selecao, body.sem-selecao * { user-select: none; -webkit-user-select: none; }
 .world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
 .frame {
   position: absolute;
@@ -286,8 +295,9 @@ button { cursor: pointer; }
   font-size: 13px;
   color: var(--note-ink);
 }
-:root[data-theme="dark"] .cmt textarea, :root[data-theme="dark"] .copia input { background: rgba(0, 0, 0, 0.18); }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .cmt textarea, :root:not([data-theme="light"]) .copia input { background: rgba(0, 0, 0, 0.18); } }
+:root[data-theme="dark"]:not([data-mural-tema="claro"]) .cmt textarea, :root[data-theme="dark"]:not([data-mural-tema="claro"]) .copia input,
+:root[data-mural-tema="escuro"] .cmt textarea, :root[data-mural-tema="escuro"] .copia input { background: rgba(0, 0, 0, 0.18); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]):not([data-mural-tema="claro"]) .cmt textarea, :root:not([data-theme="light"]):not([data-mural-tema="claro"]) .copia input { background: rgba(0, 0, 0, 0.18); } }
 .answer-row { display: flex; gap: 6px; }
 .answer-row:empty { display: none; }
 .nota {
@@ -298,9 +308,9 @@ button { cursor: pointer; }
   overflow-wrap: anywhere;
 }
 .nota strong { color: var(--st-done); }
-.card-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 11.5px; }
-.card-foot .meta { opacity: 0.8; }
-.card-foot .acoes { display: flex; gap: 10px; align-items: center; flex-shrink: 0; }
+.card-foot { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 4px 8px; font-size: 11.5px; }
+.card-foot .meta { opacity: 0.8; min-width: 7em; }
+.card-foot .acoes { display: flex; gap: 10px; align-items: center; flex-shrink: 0; margin-left: auto; }
 .card-foot button.link { border: 0; background: transparent; text-decoration: underline; font-size: 11.5px; padding: 0; color: var(--note-ink); opacity: 0.8; }
 .card-foot button.avisar {
   border: 1.5px solid var(--st-sent);
@@ -326,6 +336,126 @@ button { cursor: pointer; }
   color: var(--note-ink);
 }
 .hidden { display: none !important; }
+
+/* ---------- seleção ---------- */
+.selbtn {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--note-ink);
+  background: transparent;
+  padding: 0;
+  opacity: 0;
+  display: inline-grid;
+  place-items: center;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--accent-ink);
+}
+.card:hover .selbtn, .selbtn:focus-visible, body.selecionando .selbtn, .card.sel .selbtn { opacity: 0.75; }
+.card.sel .selbtn { opacity: 1; background: var(--accent); border-color: var(--accent); }
+.card-head .esq { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.card.sel { outline: 3px solid var(--accent); outline-offset: 2px; }
+.selbar {
+  position: fixed;
+  left: 50%;
+  bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: calc(100% - 32px);
+  background: var(--bar);
+  border: 1px solid var(--bar-line);
+  border-radius: 10px;
+  padding: 8px 10px 8px 14px;
+  box-shadow: var(--shadow);
+  z-index: 15;
+  font-size: 13.5px;
+}
+.selbar b { font-variant-numeric: tabular-nums; }
+
+/* ---------- grampo (grupo de cards) ---------- */
+.grupo {
+  position: absolute;
+  background: var(--grupo-bg);
+  border: 1.5px dashed var(--grupo-line);
+  border-radius: 12px;
+  cursor: grab;
+}
+.grupo.fechado { cursor: zoom-in; }
+.grupo-head {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 56px;
+  padding: 6px 10px 0;
+  display: grid;
+  grid-template-rows: 24px 20px;
+  gap: 2px;
+  cursor: grab;
+  user-select: none;
+}
+.grupo-head:active, .grupo:active { cursor: grabbing; }
+.grupo-linha { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.grupo-linha svg { flex-shrink: 0; color: var(--ink-soft); }
+.grupo .gid { font-family: var(--font-mono); font-weight: 600; font-size: 12px; color: var(--ink-soft); }
+.grupo .gtitulo {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  border-bottom: 1px dashed transparent;
+  background: transparent;
+  padding: 1px 2px;
+  font-weight: 700;
+  font-size: 13.5px;
+  color: var(--ink);
+  cursor: text;
+}
+.grupo .gtitulo:hover, .grupo .gtitulo:focus { border-bottom-color: var(--grupo-line); outline: none; }
+.grupo .gtitulo::placeholder { color: var(--ink-soft); font-weight: 400; font-style: italic; }
+.grupo .gconta { font-size: 11.5px; color: var(--ink-soft); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.grupo-acoes { display: flex; gap: 12px; align-items: center; }
+.grupo-acoes button {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.grupo-acoes button:hover { color: var(--ink); }
+.card.atras { pointer-events: none; overflow: hidden; }
+.card.atras > * { visibility: hidden; }
+.card.enterrado { display: none; }
+.card.alvo, .grupo.alvo { box-shadow: 0 0 0 3px var(--st-sent), var(--shadow); }
+.card.arrastando { opacity: 0.85; }
+.dica {
+  position: fixed;
+  pointer-events: none;
+  background: var(--st-sent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 6px;
+  z-index: 30;
+  white-space: nowrap;
+}
+.toast { display: flex; align-items: center; gap: 12px; }
+.toast button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  padding: 0;
+}
 
 /* ---------- avisos ---------- */
 .notice {
@@ -405,6 +535,7 @@ dialog textarea { min-height: 90px; resize: vertical; }
       <button type="button" id="zoom-mais" aria-label="Aumentar zoom">+</button>
     </div>
     <button class="btn" type="button" id="ver-tudo">Ver tudo</button>
+    <button class="btn" type="button" id="tema" title="Trocar o tema: automático (segue o claude.ai), claro ou escuro">Tema: auto</button>
     <button class="btn" type="button" id="abrir-ajuda">Como funciona</button>
     <button class="btn primary" type="button" id="abrir-novo">Novo card</button>
   </div>
@@ -414,6 +545,14 @@ dialog textarea { min-height: 90px; resize: vertical; }
   <div class="world" id="world"></div>
   <div class="notice" id="aviso" role="status">Carregando os cards…</div>
 </main>
+
+<div class="selbar hidden" id="selbar" role="toolbar" aria-label="Cards selecionados">
+  <span><b id="sel-n">0</b> <span id="sel-rotulo">selecionados</span></span>
+  <button class="btn primary" type="button" id="sel-grampear">Grampear</button>
+  <button class="btn" type="button" id="sel-arquivar">Arquivar</button>
+  <button class="btn" type="button" id="sel-limpar">Limpar seleção</button>
+</div>
+<div class="dica hidden" id="dica" aria-hidden="true"></div>
 
 <dialog id="dlg-novo" aria-labelledby="novo-titulo">
   <h2 id="novo-titulo">Novo card</h2>
@@ -456,6 +595,8 @@ dialog textarea { min-height: 90px; resize: vertical; }
     <p><b>Esperando você</b> → você responde aqui → <b>Com os agentes</b> → a sessão aplica e escreve uma nota → <b>Aplicado</b>.</p>
     <p>As sessões não recebem aviso quando você responde. Elas leem o mural quando começam a trabalhar. Para chamar uma sessão na hora, use <b>Copiar aviso</b> no card respondido e cole no chat da sessão indicada em "aberto por".</p>
     <p>Arraste o quadro para mover, use a roda do mouse para o zoom e arraste um card pela faixa do ID. Cada card novo chega na área que a sessão indicou, ou em <b>Entrada</b>.</p>
+    <p><b>Grampear:</b> solte um card em cima de outro, ou de uma pilha, para grampear os dois. Você também pode marcar a bolinha no canto do card (ou usar Ctrl+clique na faixa do ID) para escolher vários e clicar em <b>Grampear</b>. A pilha pode ganhar um nome, ser aberta para ver todos os cards, arquivada inteira de uma vez ou desgrampeada. Com a pilha aberta, arraste um card para fora dela para tirá-lo, ou solte em cima de outro card da pilha para mudar a ordem.</p>
+    <p><b>Tema:</b> o botão "Tema" alterna entre automático (segue o claude.ai), claro e escuro. A escolha fica guardada só neste navegador.</p>
     <div class="dialog-actions"><button class="btn" type="button" id="ajuda-fechar">Fechar</button></div>
   </div>
 </dialog>
@@ -491,6 +632,8 @@ dialog textarea { min-height: 90px; resize: vertical; }
   const estado = {
     cards: new Map(),
     layout: new Map(),
+    grupos: new Map(),
+    selecao: new Set(),
     filtro: "todos",
     meuId: null,
     db: null,
@@ -498,7 +641,13 @@ dialog textarea { min-height: 90px; resize: vertical; }
     carregou: false,
   };
   const nos = new Map();
+  const nosGrupo = new Map();
+  const grupoDe = new Map();
   let zTopo = 10;
+  // Medidas do grampo: cabeçalho, margem interna, deslocamento das folhas de trás e quantas aparecem.
+  // CARD_W = largura real do card (280 + 12 de padding de cada lado). As colunas das áreas têm 8px de vão,
+  // então a margem da pilha fica menor que isso para não encostar no card vizinho.
+  const GH = 58, GPAD = 5, OFF = 7, ATRAS_MAX = 3, CARD_W = 304;
 
   // ---------- visão (pan / zoom) ----------
   const visao = { x: 40, y: 30, z: 0.8 };
@@ -538,20 +687,41 @@ dialog textarea { min-height: 90px; resize: vertical; }
     visao.y = 24;
     aplicarVisao();
   }
-  function irPara(id) {
-    const no = nos.get(id);
-    const pos = posicao(id);
-    if (!no || !pos) { toast(`Não achei o card ${id}.`); return; }
+  function centrarEm(x, y) {
     const r = viewport.getBoundingClientRect();
     visao.z = Math.max(visao.z, 0.85);
-    visao.x = r.width / 2 - (pos.x + 140) * visao.z;
-    visao.y = r.height / 3 - pos.y * visao.z;
+    visao.x = r.width / 2 - (x + 140) * visao.z;
+    visao.y = r.height / 3 - y * visao.z;
     aplicarVisao();
-    if (estado.filtro !== "todos" && estado.cards.get(id)?.status !== estado.filtro) definirFiltro("todos");
+  }
+  function irPara(id) {
+    const ng = nosGrupo.get(id);
+    if (ng && estado.grupos.has(id)) {
+      const g = estado.grupos.get(id);
+      centrarEm(g.x, g.y);
+      elevarGrupo(id);
+      return;
+    }
+    const no = nos.get(id);
+    if (!no || !estado.cards.has(id)) { toast(`Não achei o card ${id}.`); return; }
+    const c = estado.cards.get(id);
+    const status = STATUS_TEXTO[c.status] ? c.status : "aberto";
+    const visivelNoFiltro = estado.filtro === "todos" ? status !== "arquivado" : status === estado.filtro;
+    if (!visivelNoFiltro) definirFiltro(status === "arquivado" ? "arquivado" : "todos");
+    // Card escondido numa pilha fechada: abre a pilha para mostrar.
+    const gid = grupoDe.get(id);
+    if (gid) {
+      const g = estado.grupos.get(gid);
+      if (g && !g.aberto && membrosVisiveis(gid)[0] !== id) gravarGrupo(gid, Object.assign({}, g, { aberto: true }));
+      renderizar();
+      elevarGrupo(gid);
+    } else {
+      no.raiz.style.zIndex = ++zTopo;
+    }
+    centrarEm(parseInt(no.raiz.style.left, 10) || 0, parseInt(no.raiz.style.top, 10) || 0);
     no.raiz.classList.remove("flash");
     void no.raiz.offsetWidth;
     no.raiz.classList.add("flash");
-    no.raiz.style.zIndex = ++zTopo;
   }
 
   viewport.addEventListener("wheel", (e) => {
@@ -561,13 +731,23 @@ dialog textarea { min-height: 90px; resize: vertical; }
     zoomEm(e.clientX - r.left, e.clientY - r.top, visao.z * fator);
   }, { passive: false });
 
+  // Arrasto em andamento: tira qualquer seleção de texto e impede que comece outra.
+  function travarSelecao(sim) {
+    document.body.classList.toggle("sem-selecao", sim);
+    if (sim) { try { window.getSelection().removeAllRanges(); } catch (_) {} }
+  }
+  document.addEventListener("selectstart", (e) => {
+    if (document.body.classList.contains("sem-selecao")) e.preventDefault();
+  });
+
   let pan = null;
   viewport.addEventListener("pointerdown", (e) => {
-    if (e.target.closest(".card") || e.target.closest(".notice")) return;
+    if (e.target.closest(".card") || e.target.closest(".grupo") || e.target.closest(".notice")) return;
     if (e.button !== 0 && e.button !== 1) return;
     pan = { id: e.pointerId, sx: e.clientX, sy: e.clientY, vx: visao.x, vy: visao.y };
     viewport.setPointerCapture(e.pointerId);
     viewport.classList.add("panning");
+    travarSelecao(true);
   });
   viewport.addEventListener("pointermove", (e) => {
     if (!pan || e.pointerId !== pan.id) return;
@@ -579,9 +759,27 @@ dialog textarea { min-height: 90px; resize: vertical; }
     if (!pan || e.pointerId !== pan.id) return;
     pan = null;
     viewport.classList.remove("panning");
+    travarSelecao(false);
   };
   viewport.addEventListener("pointerup", fimPan);
   viewport.addEventListener("pointercancel", fimPan);
+
+  // ---------- tema (só neste navegador) ----------
+  const TEMAS = ["auto", "claro", "escuro"];
+  const TEMA_ROTULO = { auto: "Tema: auto", claro: "Tema: claro", escuro: "Tema: escuro" };
+  function aplicarTema(t) {
+    if (t === "auto") delete document.documentElement.dataset.muralTema;
+    else document.documentElement.dataset.muralTema = t;
+    $("#tema").textContent = TEMA_ROTULO[t];
+  }
+  let tema = "auto";
+  try { const salvo = localStorage.getItem("mural-tema"); if (TEMAS.includes(salvo)) tema = salvo; } catch (_) {}
+  aplicarTema(tema);
+  $("#tema").addEventListener("click", () => {
+    tema = TEMAS[(TEMAS.indexOf(tema) + 1) % TEMAS.length];
+    aplicarTema(tema);
+    try { localStorage.setItem("mural-tema", tema); } catch (_) {}
+  });
 
   $("#zoom-mais").addEventListener("click", () => { const [cx, cy] = centroViewport(); zoomEm(cx, cy, visao.z * 1.2); });
   $("#zoom-menos").addEventListener("click", () => { const [cx, cy] = centroViewport(); zoomEm(cx, cy, visao.z / 1.2); });
@@ -653,7 +851,8 @@ dialog textarea { min-height: 90px; resize: vertical; }
     const a = texto(c.area);
     return FRAMES.some((f) => f.id === a) ? a : ENTRADA.id;
   }
-  function empilhar(visiveis) {
+  // caixas: área ocupada pelos grampos visíveis ({x, y, w, h}); cards automáticos não caem em cima delas.
+  function empilhar(visiveis, caixas) {
     posAuto.clear();
     const fundo = new Map(FRAMES.map((f) => [f.id, 0]));
     for (const f of FRAMES) {
@@ -665,6 +864,11 @@ dialog textarea { min-height: 90px; resize: vertical; }
         if (!l || !no) continue;
         colunas.forEach((x, k) => {
           if (Math.abs(l.x - x) < 280) alturas[k] = Math.max(alturas[k], l.y + no.raiz.offsetHeight + 18);
+        });
+      }
+      for (const b of caixas) {
+        colunas.forEach((x, k) => {
+          if (b.x < x + CARD_W && b.x + b.w > x) alturas[k] = Math.max(alturas[k], b.y + b.h + 18);
         });
       }
       const ids = visiveis
@@ -684,6 +888,10 @@ dialog textarea { min-height: 90px; resize: vertical; }
       const f = FRAMES.find((q) => l.x >= q.x && l.x < q.x + q.w);
       if (f) fundo.set(f.id, Math.max(fundo.get(f.id), l.y + no.raiz.offsetHeight + 18));
     }
+    for (const b of caixas) {
+      const f = FRAMES.find((q) => b.x >= q.x && b.x < q.x + q.w);
+      if (f) fundo.set(f.id, Math.max(fundo.get(f.id), b.y + b.h + 18));
+    }
     const alto = Math.max(1700, ...[...fundo.values()].map((y) => y + 40));
     for (const f of FRAMES) { f.h = alto; if (f.el) f.el.style.height = alto + "px"; }
   }
@@ -700,7 +908,16 @@ dialog textarea { min-height: 90px; resize: vertical; }
     cid.className = "cid";
     const pill = document.createElement("span");
     pill.className = "pill";
-    head.append(cid, pill);
+    const esq = document.createElement("span");
+    esq.className = "esq";
+    const selbtn = document.createElement("button");
+    selbtn.type = "button";
+    selbtn.className = "selbtn";
+    selbtn.title = "Selecionar (para grampear ou arquivar vários)";
+    selbtn.setAttribute("aria-label", "Selecionar " + id);
+    selbtn.setAttribute("aria-pressed", "false");
+    esq.append(selbtn, cid);
+    head.append(esq, pill);
     const titulo = document.createElement("h3");
     const ctx = document.createElement("div");
     ctx.className = "ctx";
@@ -741,7 +958,11 @@ dialog textarea { min-height: 90px; resize: vertical; }
     const arq = document.createElement("button");
     arq.type = "button";
     arq.className = "link";
-    acoes.append(avisar, arq);
+    const tirar = document.createElement("button");
+    tirar.type = "button";
+    tirar.className = "link hidden";
+    tirar.textContent = "Tirar do grampo";
+    acoes.append(avisar, tirar, arq);
     foot.append(meta, acoes);
     raiz.append(head, titulo, ctx, code, opts, itens, cmt, respRow, nota, copia, foot);
     avisar.addEventListener("click", () => copiarAviso(id));
@@ -772,37 +993,27 @@ dialog textarea { min-height: 90px; resize: vertical; }
       else atualizarCard(id, { status: "arquivado", statusAntes: c.status || "aberto" });
     });
 
-    raiz.addEventListener("pointerdown", () => { raiz.style.zIndex = ++zTopo; });
+    raiz.addEventListener("pointerdown", () => {
+      const gid = grupoDe.get(id);
+      if (gid) elevarGrupo(gid);
+      else raiz.style.zIndex = ++zTopo;
+    });
+    selbtn.addEventListener("pointerdown", (e) => e.stopPropagation());
+    selbtn.addEventListener("click", () => alternarSelecao(id));
+    tirar.addEventListener("click", () => tirarDoGrampo(id));
 
-    let arrasto = null;
+    // Faixa do ID: arrasta o card (ou a pilha inteira, se ele estiver numa pilha fechada).
+    // Ctrl/Shift/Cmd + clique seleciona.
     head.addEventListener("pointerdown", (e) => {
-      if (e.button !== 0) return;
-      const p = posicao(id);
-      arrasto = { pid: e.pointerId, sx: e.clientX, sy: e.clientY, x: p.x, y: p.y, moveu: false };
-      head.setPointerCapture(e.pointerId);
+      if (e.button !== 0 || e.target.closest("button")) return;
       e.stopPropagation();
+      if (e.ctrlKey || e.metaKey || e.shiftKey) { e.preventDefault(); alternarSelecao(id); return; }
+      const gid = grupoDe.get(id);
+      const g = gid && estado.grupos.get(gid);
+      arrastar(e, head, g && !g.aberto ? { grupo: gid } : { card: id });
     });
-    head.addEventListener("pointermove", (e) => {
-      if (!arrasto || e.pointerId !== arrasto.pid) return;
-      const dx = (e.clientX - arrasto.sx) / visao.z;
-      const dy = (e.clientY - arrasto.sy) / visao.z;
-      if (Math.abs(dx) + Math.abs(dy) > 2) arrasto.moveu = true;
-      raiz.style.left = Math.round(arrasto.x + dx) + "px";
-      raiz.style.top = Math.round(arrasto.y + dy) + "px";
-    });
-    const soltar = (e) => {
-      if (!arrasto || e.pointerId !== arrasto.pid) return;
-      const a = arrasto;
-      arrasto = null;
-      if (!a.moveu) return;
-      const nova = { x: parseInt(raiz.style.left, 10), y: parseInt(raiz.style.top, 10) };
-      estado.layout.set(id, nova);
-      if (estado.db) escrever("layout/" + id, () => estado.db.collection("layout").doc(id).set(nova));
-    };
-    head.addEventListener("pointerup", soltar);
-    head.addEventListener("pointercancel", soltar);
 
-    const no = { raiz, cid, pill, titulo, ctx, code, opts, itens, ta, respRow, nota, copia, meta, avisar, arq, assinatura: "" };
+    const no = { raiz, cid, pill, titulo, ctx, code, opts, itens, ta, respRow, nota, copia, meta, avisar, arq, tirar, selbtn, altura: 0, camada: 0, assinatura: "" };
     nos.set(id, no);
     return no;
   }
@@ -971,30 +1182,46 @@ dialog textarea { min-height: 90px; resize: vertical; }
   }
   document.querySelectorAll("[data-filter]").forEach((b) => b.addEventListener("click", () => definirFiltro(b.dataset.filter)));
 
+  function statusDe(c) { return STATUS_TEXTO[c.status] ? c.status : "aberto"; }
+  function visivel(c) {
+    const status = statusDe(c);
+    return estado.filtro === "todos" ? status !== "arquivado" : status === estado.filtro;
+  }
+
   function renderizar() {
     const contagem = { todos: 0, aberto: 0, respondido: 0, aplicado: 0, arquivado: 0 };
     for (const [id, no] of nos) {
       if (!estado.cards.has(id)) { no.raiz.remove(); nos.delete(id); }
     }
-    const visiveis = [];
+    indexarGrupos();
+    const soltos = [];
     for (const [id, c] of estado.cards) {
       const no = nos.get(id) || criarNo(id);
       const assinatura = JSON.stringify([c, estado.meuId, estado.podeEscrever]);
       if (assinatura !== no.assinatura) { preencherNo(id, c, no); no.assinatura = assinatura; }
-      const status = STATUS_TEXTO[c.status] ? c.status : "aberto";
+      const status = statusDe(c);
       contagem[status]++;
       if (status !== "arquivado") contagem.todos++;
-      const visivel = estado.filtro === "todos" ? status !== "arquivado" : status === estado.filtro;
-      no.raiz.classList.toggle("hidden", !visivel);
-      if (visivel) visiveis.push([id, c]);
+      const ver = visivel(c);
+      const noGrupo = grupoDe.has(id);
+      no.raiz.classList.toggle("hidden", !ver);
+      no.tirar.classList.toggle("hidden", !noGrupo || !estado.podeEscrever);
+      if (!noGrupo) {
+        no.raiz.classList.remove("atras", "enterrado");
+        no.raiz.style.height = "";
+        if (ver) soltos.push([id, c]);
+      }
     }
-    empilhar(visiveis);
+    const { caixas, posGrupo } = montarGrupos();
+    empilhar(soltos, caixas);
     for (const [id] of estado.cards) {
-      const p = posicao(id);
+      const p = grupoDe.has(id) ? posGrupo.get(id) : posicao(id);
+      if (!p) continue;
       const no = nos.get(id);
       no.raiz.style.left = p.x + "px";
       no.raiz.style.top = p.y + "px";
     }
+    atualizarSelecao();
     for (const k of Object.keys(contagem)) $("#n-" + k).textContent = contagem[k];
     if (estado.carregou) {
       if (!estado.cards.size) {
@@ -1005,6 +1232,523 @@ dialog textarea { min-height: 90px; resize: vertical; }
       }
     }
   }
+
+  // ---------- grampo (grupos de cards) ----------
+  // grupos/<G-nn> = { id, titulo, ids: [card do topo primeiro…], x, y, aberto, criadoEm }. Só a página mexe.
+  // Um card pertence ao primeiro grupo que o lista. Grupo com menos de 2 cards se desfaz sozinho.
+  function normalizarGrupo(gid, d) {
+    return {
+      id: gid,
+      titulo: texto(d.titulo),
+      ids: Array.isArray(d.ids) ? d.ids.filter((x) => typeof x === "string" && x) : [],
+      x: isFinite(d.x) ? d.x : ENTRADA.x + 20,
+      y: isFinite(d.y) ? d.y : ENTRADA.y + 40,
+      aberto: !!d.aberto,
+      criadoEm: texto(d.criadoEm),
+    };
+  }
+  function indexarGrupos() {
+    grupoDe.clear();
+    for (const [gid, g] of estado.grupos) {
+      for (const id of g.ids) if (!grupoDe.has(id)) grupoDe.set(id, gid);
+    }
+  }
+  function membrosVisiveis(gid) {
+    const g = estado.grupos.get(gid);
+    if (!g) return [];
+    return g.ids.filter((id) => grupoDe.get(id) === gid && estado.cards.has(id) && visivel(estado.cards.get(id)));
+  }
+  function membrosExistentes(gid) {
+    const g = estado.grupos.get(gid);
+    return g ? g.ids.filter((id) => grupoDe.get(id) === gid && estado.cards.has(id)) : [];
+  }
+  function proximoGid() {
+    let maior = 0;
+    for (const gid of estado.grupos.keys()) {
+      const m = /^G-(\d+)$/.exec(gid);
+      if (m) maior = Math.max(maior, parseInt(m[1], 10));
+    }
+    return "G-" + String(maior + 1).padStart(2, "0");
+  }
+
+  const CLIPE = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>';
+
+  function criarNoGrupo(gid) {
+    const raiz = document.createElement("section");
+    raiz.className = "grupo";
+    raiz.dataset.gid = gid;
+    raiz.setAttribute("aria-label", "Grampo " + gid);
+    const head = document.createElement("div");
+    head.className = "grupo-head";
+    head.title = "Arraste para mover a pilha";
+    const linha = document.createElement("div");
+    linha.className = "grupo-linha";
+    linha.innerHTML = CLIPE;
+    const gidEl = document.createElement("span");
+    gidEl.className = "gid";
+    gidEl.textContent = gid;
+    const titulo = document.createElement("input");
+    titulo.className = "gtitulo";
+    titulo.maxLength = 80;
+    titulo.placeholder = "dar um nome";
+    titulo.setAttribute("aria-label", "Nome do grampo " + gid);
+    const conta = document.createElement("span");
+    conta.className = "gconta";
+    linha.append(gidEl, titulo, conta);
+    const acoes = document.createElement("div");
+    acoes.className = "grupo-acoes";
+    const btnAbrir = document.createElement("button");
+    btnAbrir.type = "button";
+    const btnArq = document.createElement("button");
+    btnArq.type = "button";
+    const btnSoltar = document.createElement("button");
+    btnSoltar.type = "button";
+    btnSoltar.textContent = "Desgrampear";
+    acoes.append(btnAbrir, btnArq, btnSoltar);
+    head.append(linha, acoes);
+    raiz.append(head);
+    world.append(raiz);
+
+    raiz.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0 || e.target.closest("input, button")) return;
+      e.stopPropagation();
+      const noCorpo = !e.target.closest(".grupo-head");
+      arrastar(e, raiz, { grupo: gid }, () => {
+        const g = estado.grupos.get(gid);
+        if (noCorpo && g && !g.aberto) { gravarGrupo(gid, Object.assign({}, g, { aberto: true })); renderizar(); }
+      });
+    });
+    titulo.addEventListener("keydown", (e) => { if (e.key === "Enter") titulo.blur(); });
+    titulo.addEventListener("change", () => {
+      const g = estado.grupos.get(gid);
+      if (g && g.titulo !== titulo.value.trim()) { gravarGrupo(gid, Object.assign({}, g, { titulo: titulo.value.trim() })); renderizar(); }
+    });
+    btnAbrir.addEventListener("click", () => {
+      const g = estado.grupos.get(gid);
+      if (g) { gravarGrupo(gid, Object.assign({}, g, { aberto: !g.aberto })); renderizar(); }
+    });
+    btnArq.addEventListener("click", () => arquivarGrupo(gid));
+    btnSoltar.addEventListener("click", () => desgrampear(gid));
+
+    const ng = { raiz, titulo, conta, btnAbrir, btnArq, btnSoltar, w: CARD_W, h: 0, zBase: ++zTopo };
+    zTopo += 60;
+    nosGrupo.set(gid, ng);
+    return ng;
+  }
+
+  function elevarGrupo(gid) {
+    const ng = nosGrupo.get(gid);
+    if (!ng) return;
+    ng.zBase = zTopo + 1;
+    zTopo += 2 + (estado.grupos.get(gid)?.ids.length || 0);
+    aplicarZGrupo(gid);
+  }
+  function aplicarZGrupo(gid) {
+    const ng = nosGrupo.get(gid);
+    const g = estado.grupos.get(gid);
+    if (!ng || !g) return;
+    ng.raiz.style.zIndex = ng.zBase;
+    const n = g.ids.length;
+    for (const id of g.ids) {
+      const no = nos.get(id);
+      if (no && grupoDe.get(id) === gid) no.raiz.style.zIndex = ng.zBase + 1 + (n - no.camada);
+    }
+  }
+
+  // Posiciona as pilhas: fechada = card do topo inteiro e até 3 folhas atrás; aberta = coluna.
+  function montarGrupos() {
+    for (const [gid, ng] of nosGrupo) {
+      if (!estado.grupos.has(gid)) { ng.raiz.remove(); nosGrupo.delete(gid); }
+    }
+    const caixas = [];
+    const posGrupo = new Map();
+    for (const [gid, g] of estado.grupos) {
+      const ng = nosGrupo.get(gid) || criarNoGrupo(gid);
+      const membros = membrosVisiveis(gid);
+      ng.raiz.classList.toggle("hidden", !membros.length);
+      if (!membros.length) continue;
+      for (const id of membros) {
+        const no = nos.get(id);
+        no.raiz.classList.remove("atras", "enterrado");
+        no.raiz.style.height = "";
+        no.altura = no.raiz.offsetHeight;
+      }
+      let w, h;
+      if (g.aberto) {
+        let y = g.y + GH;
+        membros.forEach((id, k) => {
+          const no = nos.get(id);
+          no.camada = k;
+          posGrupo.set(id, { x: g.x + GPAD, y });
+          y += no.altura + 12;
+        });
+        w = CARD_W + 2 * GPAD;
+        h = y - 12 - g.y + GPAD;
+      } else {
+        const topo = nos.get(membros[0]);
+        const atras = Math.min(ATRAS_MAX, membros.length - 1);
+        membros.forEach((id, k) => {
+          const no = nos.get(id);
+          no.camada = k;
+          if (k > atras) { no.raiz.classList.add("enterrado"); return; }
+          posGrupo.set(id, { x: g.x + GPAD + k * OFF, y: g.y + GH + k * OFF });
+          if (k > 0) { no.raiz.classList.add("atras"); no.raiz.style.height = topo.altura + "px"; }
+        });
+        w = CARD_W + 2 * GPAD + atras * OFF;
+        h = GH + topo.altura + atras * OFF + GPAD;
+      }
+      ng.w = w;
+      ng.h = h;
+      ng.raiz.style.left = g.x + "px";
+      ng.raiz.style.top = g.y + "px";
+      ng.raiz.style.width = w + "px";
+      ng.raiz.style.height = h + "px";
+      ng.raiz.classList.toggle("fechado", !g.aberto && membros.length > 1);
+      ng.raiz.title = !g.aberto && membros.length > 1 ? "Clique para abrir a pilha" : "";
+      if (document.activeElement !== ng.titulo) ng.titulo.value = g.titulo;
+      const total = membrosExistentes(gid).length;
+      ng.conta.textContent = `${membros.length} ${membros.length === 1 ? "card" : "cards"}` + (total > membros.length ? ` de ${total}` : "");
+      ng.btnAbrir.textContent = g.aberto ? "Fechar pilha" : "Abrir pilha";
+      ng.btnAbrir.classList.toggle("hidden", membros.length < 2);
+      const todosArq = membrosExistentes(gid).every((id) => statusDe(estado.cards.get(id)) === "arquivado");
+      ng.btnArq.textContent = todosArq ? "Desarquivar todos" : "Arquivar todos";
+      for (const b of [ng.btnArq, ng.btnSoltar]) b.disabled = !estado.podeEscrever;
+      ng.titulo.readOnly = !estado.podeEscrever;
+      aplicarZGrupo(gid);
+      caixas.push({ x: g.x, y: g.y, w, h });
+    }
+    return { caixas, posGrupo };
+  }
+
+  // ---- escrita de grupos e posições, com "Desfazer" ----
+  let trans = null;
+  const copiar = (v) => (v == null ? null : JSON.parse(JSON.stringify(v)));
+  function gravarGrupo(gid, dados) {
+    if (trans && !trans.grupos.has(gid)) trans.grupos.set(gid, copiar(estado.grupos.get(gid)));
+    if (dados) estado.grupos.set(gid, normalizarGrupo(gid, dados));
+    else estado.grupos.delete(gid);
+    indexarGrupos();
+    if (!estado.db) return;
+    const val = copiar(estado.grupos.get(gid));
+    const ref = estado.db.collection("grupos").doc(gid);
+    escrever("grupos/" + gid, () => (val ? ref.set(val) : ref.delete()));
+  }
+  function gravarLayout(id, pos) {
+    if (trans && !trans.layout.has(id)) trans.layout.set(id, copiar(estado.layout.get(id)));
+    if (pos) estado.layout.set(id, { x: Math.round(pos.x), y: Math.round(pos.y) });
+    else estado.layout.delete(id);
+    if (!estado.db) return;
+    const val = copiar(estado.layout.get(id));
+    const ref = estado.db.collection("layout").doc(id);
+    escrever("layout/" + id, () => (val ? ref.set(val) : ref.delete()));
+  }
+  function comecar() { trans = { grupos: new Map(), layout: new Map() }; }
+  function terminar(msg) {
+    const t = trans;
+    trans = null;
+    renderizar();
+    toast(msg, {
+      rotulo: "Desfazer",
+      acao: () => {
+        for (const [gid, d] of t.grupos) gravarGrupo(gid, d);
+        for (const [id, p] of t.layout) gravarLayout(id, p);
+        renderizar();
+        toast("Desfeito.");
+      },
+    });
+  }
+
+  function posAtual(id, reserva) {
+    const no = nos.get(id);
+    if (no && !no.raiz.classList.contains("hidden") && !no.raiz.classList.contains("enterrado") && no.raiz.style.left) {
+      return { x: parseInt(no.raiz.style.left, 10), y: parseInt(no.raiz.style.top, 10) };
+    }
+    return reserva || posicao(id);
+  }
+  // Grupo perdeu cards: grava o resto, ou desfaz o grupo se sobrar menos de 2.
+  function aplicarResto(gid, resto) {
+    const g = estado.grupos.get(gid);
+    if (!g) return;
+    const existentes = resto.filter((x) => estado.cards.has(x));
+    if (existentes.length >= 2) { gravarGrupo(gid, Object.assign({}, g, { ids: resto })); return; }
+    const reserva = { x: g.x + GPAD, y: g.y + GH };
+    for (const x of existentes) gravarLayout(x, posAtual(x, reserva));
+    gravarGrupo(gid, null);
+  }
+  // Põe os cards no topo do grupo destino ({gid}) ou num grupo novo ({x, y}). Devolve o id do grupo.
+  function moverParaGrupo(ids, destino) {
+    const lista = [...new Set(ids)];
+    const origens = new Set(lista.map((i) => grupoDe.get(i)).filter((g) => g && g !== destino.gid));
+    for (const gid of origens) {
+      const g = estado.grupos.get(gid);
+      if (g) aplicarResto(gid, g.ids.filter((x) => !lista.includes(x)));
+    }
+    if (destino.gid) {
+      const g = estado.grupos.get(destino.gid);
+      gravarGrupo(destino.gid, Object.assign({}, g, { ids: [...lista, ...g.ids.filter((x) => !lista.includes(x))] }));
+      return destino.gid;
+    }
+    const gid = proximoGid();
+    // Não deixa o cabeçalho da pilha nova cobrir o nome da área.
+    const f = FRAMES.find((q) => destino.x + GPAD >= q.x && destino.x < q.x + q.w);
+    const y = f ? Math.max(destino.y, f.y + 48) : destino.y;
+    gravarGrupo(gid, { id: gid, titulo: "", ids: lista, x: Math.round(destino.x), y: Math.round(y), aberto: false, criadoEm: new Date().toISOString() });
+    return gid;
+  }
+  // Card que sai do grampo pelo botão volta para a área dele (empilhamento automático, sem sobrepor nada).
+  function piscar(id) {
+    const no = nos.get(id);
+    if (!no) return;
+    no.raiz.classList.remove("flash");
+    void no.raiz.offsetWidth;
+    no.raiz.classList.add("flash");
+  }
+  function nomeArea(id) {
+    const c = estado.cards.get(id);
+    const f = c && FRAMES.find((q) => q.id === areaDe(c));
+    return f ? f.nome : ENTRADA.nome;
+  }
+  function tirarDoGrampo(id) {
+    const gid = grupoDe.get(id);
+    const g = gid && estado.grupos.get(gid);
+    if (!g) return;
+    comecar();
+    aplicarResto(gid, g.ids.filter((x) => x !== id));
+    gravarLayout(id, null);
+    terminar(`${id} saiu do grampo ${gid} e voltou para ${nomeArea(id)}.`);
+    piscar(id);
+  }
+  function desgrampear(gid) {
+    const g = estado.grupos.get(gid);
+    if (!g) return;
+    comecar();
+    for (const id of membrosExistentes(gid)) gravarLayout(id, null);
+    gravarGrupo(gid, null);
+    terminar(`${gid} desgrampeado. Os cards voltaram para as áreas deles.`);
+  }
+  function arquivarGrupo(gid) {
+    const ids = membrosExistentes(gid);
+    const todosArq = ids.every((id) => statusDe(estado.cards.get(id)) === "arquivado");
+    for (const id of ids) {
+      const c = estado.cards.get(id);
+      if (todosArq) atualizarCard(id, { status: c.statusAntes || "aberto" });
+      else if (statusDe(c) !== "arquivado") atualizarCard(id, { status: "arquivado", statusAntes: statusDe(c) });
+    }
+    const nome = estado.grupos.get(gid)?.titulo ? `${gid} (${estado.grupos.get(gid).titulo})` : gid;
+    toast(todosArq ? `${nome} desarquivado.` : `${nome} arquivado. Ele fica em "Arquivados".`);
+  }
+
+  // ---- arrastar cards e pilhas, e soltar em cima de outro para grampear ----
+  const dica = $("#dica");
+  function acharAlvo(cx, cy, ent, ignorar) {
+    for (const el of document.elementsFromPoint(cx, cy)) {
+      const c = el.closest(".card");
+      if (c) {
+        if (ignorar.has(c.dataset.id) || c.classList.contains("hidden")) continue;
+        return { card: c.dataset.id };
+      }
+      const g = el.closest(".grupo");
+      if (g) {
+        if (g.dataset.gid === ent.grupo) continue;
+        return { grupo: g.dataset.gid };
+      }
+      if (el === viewport) break;
+    }
+    return null;
+  }
+  // Traduz o alvo bruto no que vai acontecer ao soltar.
+  function intencao(ent, alvo) {
+    if (!alvo) return null;
+    const destino = alvo.grupo || grupoDe.get(alvo.card) || null;
+    if (ent.card) {
+      const origem = grupoDe.get(ent.card);
+      if (origem && destino === origem) {
+        return alvo.card ? { tipo: "ordem", el: nos.get(alvo.card).raiz, texto: "Soltar para mudar a ordem" } : null;
+      }
+    }
+    if (destino) {
+      const nome = estado.grupos.get(destino)?.titulo || destino;
+      return { tipo: "grupo", gid: destino, el: nosGrupo.get(destino)?.raiz, texto: `Soltar para grampear em ${nome}` };
+    }
+    return { tipo: "novo", card: alvo.card, el: nos.get(alvo.card).raiz, texto: `Soltar para grampear com ${alvo.card}` };
+  }
+  function arrastar(e, alca, ent, aoClicar) {
+    const els = [];
+    const ignorar = new Set();
+    if (ent.grupo) {
+      elevarGrupo(ent.grupo);
+      els.push(nosGrupo.get(ent.grupo).raiz);
+      for (const id of estado.grupos.get(ent.grupo)?.ids || []) {
+        const no = nos.get(id);
+        if (no && grupoDe.get(id) === ent.grupo) { els.push(no.raiz); ignorar.add(id); }
+      }
+    } else {
+      const gid = grupoDe.get(ent.card);
+      if (gid) elevarGrupo(gid);
+      const no = nos.get(ent.card);
+      no.raiz.style.zIndex = ++zTopo;
+      els.push(no.raiz);
+      ignorar.add(ent.card);
+    }
+    const inicio = els.map((el) => [parseInt(el.style.left, 10) || 0, parseInt(el.style.top, 10) || 0]);
+    const a = { pid: e.pointerId, sx: e.clientX, sy: e.clientY, dx: 0, dy: 0, moveu: false, alvo: null };
+    alca.setPointerCapture(e.pointerId);
+    travarSelecao(true);
+    const marcar = (alvo, ev) => {
+      const nova = intencao(ent, alvo);
+      if (a.alvo?.el !== nova?.el && a.alvo?.el) a.alvo.el.classList.remove("alvo");
+      a.alvo = nova;
+      if (nova && nova.el && estado.podeEscrever) {
+        nova.el.classList.add("alvo");
+        dica.textContent = nova.texto;
+        dica.style.left = ev.clientX + 16 + "px";
+        dica.style.top = ev.clientY + 14 + "px";
+        dica.classList.remove("hidden");
+      } else {
+        dica.classList.add("hidden");
+      }
+    };
+    const mover = (ev) => {
+      if (ev.pointerId !== a.pid) return;
+      a.dx = (ev.clientX - a.sx) / visao.z;
+      a.dy = (ev.clientY - a.sy) / visao.z;
+      if (!a.moveu) {
+        if (Math.abs(a.dx) + Math.abs(a.dy) <= 3) return;
+        a.moveu = true;
+        els.forEach((el) => el.classList.contains("card") && el.classList.add("arrastando"));
+      }
+      els.forEach((el, i) => {
+        el.style.left = Math.round(inicio[i][0] + a.dx) + "px";
+        el.style.top = Math.round(inicio[i][1] + a.dy) + "px";
+      });
+      marcar(acharAlvo(ev.clientX, ev.clientY, ent, ignorar), ev);
+    };
+    const fim = (ev) => {
+      if (ev.pointerId !== a.pid) return;
+      alca.removeEventListener("pointermove", mover);
+      alca.removeEventListener("pointerup", fim);
+      alca.removeEventListener("pointercancel", fim);
+      travarSelecao(false);
+      const alvo = estado.podeEscrever ? a.alvo : null;
+      if (a.alvo?.el) a.alvo.el.classList.remove("alvo");
+      dica.classList.add("hidden");
+      els.forEach((el) => el.classList.remove("arrastando"));
+      if (ev.type === "pointercancel") { renderizar(); return; }
+      if (!a.moveu) { if (aoClicar) aoClicar(); return; }
+      soltarEm(ent, alvo, Math.round(inicio[0][0] + a.dx), Math.round(inicio[0][1] + a.dy));
+    };
+    alca.addEventListener("pointermove", mover);
+    alca.addEventListener("pointerup", fim);
+    alca.addEventListener("pointercancel", fim);
+  }
+  function soltarEm(ent, alvo, x, y) {
+    if (ent.grupo) {
+      const g = estado.grupos.get(ent.grupo);
+      if (!g) { renderizar(); return; }
+      if (alvo && alvo.tipo === "grupo") {
+        comecar();
+        moverParaGrupo(g.ids, { gid: alvo.gid });
+        terminar(`${ent.grupo} juntado em ${alvo.gid}.`);
+      } else if (alvo && alvo.tipo === "novo") {
+        comecar();
+        gravarGrupo(ent.grupo, Object.assign({}, g, { x, y, ids: [...g.ids, alvo.card] }));
+        terminar(`${alvo.card} grampeado em ${ent.grupo}.`);
+      } else {
+        gravarGrupo(ent.grupo, Object.assign({}, g, { x, y }));
+        renderizar();
+      }
+      return;
+    }
+    const id = ent.card;
+    const origem = grupoDe.get(id);
+    if (alvo && alvo.tipo === "ordem") {
+      const g = estado.grupos.get(origem);
+      const alvoId = alvo.el.dataset.id;
+      const ids = g.ids.filter((x) => x !== id);
+      ids.splice(ids.indexOf(alvoId), 0, id);
+      gravarGrupo(origem, Object.assign({}, g, { ids }));
+      renderizar();
+    } else if (alvo && alvo.tipo === "grupo") {
+      comecar();
+      moverParaGrupo([id], { gid: alvo.gid });
+      terminar(`${id} grampeado em ${alvo.gid}.`);
+    } else if (alvo && alvo.tipo === "novo") {
+      const p = posAtual(alvo.card);
+      comecar();
+      const gid = moverParaGrupo([id, alvo.card], { x: p.x - GPAD, y: p.y - GH });
+      terminar(`${id} e ${alvo.card} grampeados em ${gid}.`);
+    } else if (origem && membrosVisiveis(origem).length && !foraDoGrupo(origem, x, y)) {
+      renderizar(); // soltou dentro da própria pilha: volta para o lugar
+    } else if (origem) {
+      comecar();
+      aplicarResto(origem, estado.grupos.get(origem).ids.filter((x) => x !== id));
+      gravarLayout(id, { x, y });
+      terminar(`${id} saiu do grampo ${origem}.`);
+    } else {
+      gravarLayout(id, { x, y });
+      renderizar();
+    }
+  }
+  function foraDoGrupo(gid, x, y) {
+    const g = estado.grupos.get(gid);
+    const ng = nosGrupo.get(gid);
+    if (!g || !ng) return true;
+    const cx = x + CARD_W / 2, cy = y + 30;
+    return cx < g.x || cx > g.x + ng.w || cy < g.y || cy > g.y + ng.h;
+  }
+
+  // ---- seleção ----
+  function alternarSelecao(id) {
+    if (estado.selecao.has(id)) estado.selecao.delete(id);
+    else estado.selecao.add(id);
+    atualizarSelecao();
+  }
+  function limparSelecao() { estado.selecao.clear(); atualizarSelecao(); }
+  function atualizarSelecao() {
+    for (const id of [...estado.selecao]) if (!estado.cards.has(id)) estado.selecao.delete(id);
+    const n = estado.selecao.size;
+    $("#selbar").classList.toggle("hidden", n === 0);
+    document.body.classList.toggle("selecionando", n > 0);
+    $("#sel-n").textContent = n;
+    $("#sel-rotulo").textContent = n === 1 ? "selecionado" : "selecionados";
+    $("#sel-grampear").disabled = n < 2 || !estado.podeEscrever;
+    $("#sel-arquivar").disabled = !estado.podeEscrever;
+    for (const [id, no] of nos) {
+      const sel = estado.selecao.has(id);
+      no.raiz.classList.toggle("sel", sel);
+      no.selbtn.setAttribute("aria-pressed", String(sel));
+      no.selbtn.textContent = sel ? "✓" : "";
+    }
+  }
+  $("#sel-limpar").addEventListener("click", limparSelecao);
+  $("#sel-grampear").addEventListener("click", () => {
+    const ids = [...estado.selecao];
+    if (ids.length < 2) return;
+    // Se algum selecionado já está numa pilha, os outros entram nela; senão nasce uma pilha no lugar do primeiro.
+    const existente = ids.map((i) => grupoDe.get(i)).find(Boolean);
+    comecar();
+    let gid;
+    if (existente) {
+      gid = moverParaGrupo(ids, { gid: existente });
+    } else {
+      const p = posAtual(ids[0]);
+      gid = moverParaGrupo(ids, { x: p.x - GPAD, y: p.y - GH });
+    }
+    estado.selecao.clear();
+    terminar(`${ids.length} cards grampeados em ${gid}.`);
+  });
+  $("#sel-arquivar").addEventListener("click", () => {
+    const ids = [...estado.selecao];
+    for (const id of ids) {
+      const c = estado.cards.get(id);
+      if (c && statusDe(c) !== "arquivado") atualizarCard(id, { status: "arquivado", statusAntes: statusDe(c) });
+    }
+    limparSelecao();
+    toast(`${ids.length} ${ids.length === 1 ? "card arquivado" : "cards arquivados"}.`);
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && estado.selecao.size && !document.querySelector("dialog[open]")) limparSelecao();
+  });
 
   // ---------- novo card ----------
   const dlgNovo = $("#dlg-novo");
@@ -1053,17 +1797,27 @@ dialog textarea { min-height: 90px; resize: vertical; }
 
   // ---------- toast ----------
   let toastEl = null, toastTimer = 0;
-  function toast(msg) {
+  // opc = { rotulo, acao }: mostra um botão (ex.: "Desfazer") e fica mais tempo na tela.
+  function toast(msg, opc) {
     if (!toastEl) {
       toastEl = document.createElement("div");
       toastEl.className = "toast";
       toastEl.setAttribute("role", "status");
       document.body.append(toastEl);
     }
-    toastEl.textContent = msg;
+    const span = document.createElement("span");
+    span.textContent = msg;
+    toastEl.replaceChildren(span);
+    if (opc) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = opc.rotulo;
+      b.addEventListener("click", () => { toastEl.classList.add("hidden"); opc.acao(); }, { once: true });
+      toastEl.append(b);
+    }
     toastEl.classList.remove("hidden");
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => toastEl.classList.add("hidden"), 3200);
+    toastTimer = setTimeout(() => toastEl.classList.add("hidden"), opc ? 10000 : 3200);
   }
 
   // ---------- conexão ----------
@@ -1106,6 +1860,13 @@ dialog textarea { min-height: 90px; resize: vertical; }
           const d = ch.doc.data() || {};
           if (isFinite(d.x) && isFinite(d.y)) estado.layout.set(ch.doc.id, { x: d.x, y: d.y });
         }
+      }
+      renderizar();
+    }, () => {});
+    db.collection("grupos").onSnapshot((snap) => {
+      for (const ch of snap.docChanges()) {
+        if (ch.type === "removed") estado.grupos.delete(ch.doc.id);
+        else estado.grupos.set(ch.doc.id, normalizarGrupo(ch.doc.id, ch.doc.data() || {}));
       }
       renderizar();
     }, () => {});

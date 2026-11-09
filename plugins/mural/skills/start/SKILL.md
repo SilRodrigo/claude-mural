@@ -53,6 +53,7 @@ Faça isso no começo do trabalho e sempre que o usuário colar um aviso como `R
   - `status`: `aberto` | `respondido` | `aplicado` | `arquivado`;
   - `nota`, `origem`, `sessaoId?`, `criadoEm` (ISO), `respondidoPor`, `respondidoEm`.
 - `layout/<ID>`: {`x`, `y`}. Só a página mexe.
+- `grupos/<G-nn>`: grampo (pilha de cards) que o usuário monta na página: {`id`, `titulo`, `ids`: [IDs dos cards, o do topo primeiro], `x`, `y`, `aberto`, `criadoEm`}. **Só a página mexe**: não crie, não edite e não apague grupos. Para a sessão, um card grampeado continua sendo um card normal (lê, aplica e fecha igual). O `titulo` do grupo pode servir de contexto ("estes cards são do tópico X"). Quando o usuário arquiva a pilha inteira, cada card dela vira `status: "arquivado"`.
 - Card com `itens` (de qualquer tipo): mostra "x/y feitos"; quando o usuário marca todos, a página põe `status: "aplicado"` sozinha.
 
 ## 5. Criar o mural de um projeto novo (só com o ok do usuário)
