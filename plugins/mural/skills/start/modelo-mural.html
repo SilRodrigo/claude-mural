@@ -1,5 +1,5 @@
 <title>Mural {{PROJETO}}</title>
-<meta name="mural-versao" content="1.2.0">
+<meta name="mural-versao" content="1.2.1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Fredoka:wght@500;600&family=JetBrains+Mono:wght@400;600&display=swap">
@@ -784,9 +784,30 @@ dialog textarea { min-height: 90px; resize: vertical; }
   $("#zoom-mais").addEventListener("click", () => { const [cx, cy] = centroViewport(); zoomEm(cx, cy, visao.z * 1.2); });
   $("#zoom-menos").addEventListener("click", () => { const [cx, cy] = centroViewport(); zoomEm(cx, cy, visao.z / 1.2); });
   $("#ver-tudo").addEventListener("click", verTudo);
-  $("#ir-para").addEventListener("keydown", (e) => {
+  // Campo "Ir para": a letra já ganha o hífen ("p" → "P-"); apagar o hífen apaga a letra junto.
+  const irCampo = $("#ir-para");
+  irCampo.addEventListener("input", (e) => {
+    if (e.inputType && e.inputType.startsWith("delete")) return;
+    const v = irCampo.value.toUpperCase().replace(/\s+/g, "");
+    const m = v.match(/^([A-Z])-?(\d*)$/);
+    const novo = m ? m[1] + "-" + m[2] : v;
+    if (novo !== irCampo.value) {
+      irCampo.value = novo;
+      irCampo.setSelectionRange(novo.length, novo.length);
+    }
+  });
+  irCampo.addEventListener("keydown", (e) => {
+    const v = irCampo.value;
+    if (e.key === "Backspace" && /^[A-Za-z]-$/.test(v) &&
+        irCampo.selectionStart === v.length && irCampo.selectionEnd === v.length) {
+      e.preventDefault();
+      irCampo.value = "";
+      return;
+    }
     if (e.key !== "Enter") return;
-    const id = e.currentTarget.value.trim().toUpperCase().replace(/\s+/g, "");
+    let id = v.trim().toUpperCase().replace(/\s+/g, "");
+    const m = id.match(/^([A-Z])-?(\d+)$/);
+    if (m) id = m[1] + "-" + m[2].padStart(2, "0"); // "P-3" vira "P-03"
     if (id) irPara(id);
   });
 
