@@ -28,6 +28,7 @@ Faça isso no começo do trabalho e sempre que o usuário colar um aviso como `R
 1. Escolha o tipo e o próximo ID livre: leia `cards` e use o maior número daquele prefixo + 1, com 2 dígitos (`P-04`, `T-02`).
 2. `write_db`, `db_op: "set"`, `collection: "cards"`, `doc_id: "<ID>"`, com os campos abaixo e `status: "aberto"`.
 3. **Contexto auto-explicativo:** outra sessão, sem o seu histórico, tem que entender e aplicar a resposta. Ponha o trecho de código em `codigo` quando ajudar.
+   - **Teste antes de gravar:** releia o card como se fosse uma sessão nova. Sem o seu histórico, ela entende o que está sendo pedido e o que acontece com cada resposta? Se não, reescreva.
 4. **Prefira `opcoes` (botões)** a resposta livre: fica menos aberto a interpretação.
 5. `origem` = **título exato da sua sessão** (o usuário cola o aviso no chat que tem esse nome). `sessaoId` = o seu id `local_…`, se souber.
 6. No chat, só uma linha: "abri a P-04 no mural: <título>".

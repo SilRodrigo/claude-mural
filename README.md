@@ -22,6 +22,14 @@ Ou, sem os comandos, no `~/.claude/settings.json`:
 }
 ```
 
+### Extensão do VS Code
+Lá o `/plugin` não existe. Use o `settings.json` acima, mas confira depois: o Claude Code clona o marketplace e registra a instalação, mas pode não criar a pasta do plugin, e aí a skill não carrega. Se `~/.claude/plugins/cache/claude-mural/mural/<versão>` não existir, copie à mão e dê **Reload Window**:
+```bash
+mkdir -p ~/.claude/plugins/cache/claude-mural/mural
+cp -r ~/.claude/plugins/marketplaces/claude-mural/plugins/mural ~/.claude/plugins/cache/claude-mural/mural/<versão>
+```
+`<versão>` é a `version` de `plugins/mural/.claude-plugin/plugin.json`. A cada versão nova, refaça a cópia (depois de atualizar o marketplace).
+
 ## Atualizar
 ```
 /plugin marketplace update claude-mural

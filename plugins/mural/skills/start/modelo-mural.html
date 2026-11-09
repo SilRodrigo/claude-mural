@@ -1,5 +1,5 @@
 <title>Mural {{PROJETO}}</title>
-<meta name="mural-versao" content="1.1.0">
+<meta name="mural-versao" content="1.1.1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Fredoka:wght@500;600&family=JetBrains+Mono:wght@400;600&display=swap">
@@ -752,7 +752,15 @@ dialog textarea { min-height: 90px; resize: vertical; }
       clearTimeout(salvarCmt);
       const atual = estado.cards.get(id);
       if (!atual || (atual.comentario || "") === ta.value) return;
-      atualizarCard(id, { comentario: ta.value });
+      const dados = { comentario: ta.value };
+      // Card sem opções já enviado: a resposta é o próprio comentário, então acompanha a correção.
+      const temOpcoes = Array.isArray(atual.opcoes) && atual.opcoes.some((o) => typeof o === "string" && o);
+      if (!temOpcoes && atual.status === "respondido") {
+        const txt = ta.value.trim();
+        if (txt) dados.resposta = txt;
+        else Object.assign(dados, { status: "aberto", resposta: null, respondidoPor: null, respondidoEm: null });
+      }
+      atualizarCard(id, dados);
     };
     ta.addEventListener("input", () => { clearTimeout(salvarCmt); salvarCmt = setTimeout(gravarComentario, 900); });
     ta.addEventListener("blur", gravarComentario);
