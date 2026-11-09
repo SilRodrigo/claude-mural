@@ -1,6 +1,6 @@
 {
   "name": "mural",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Mural do projeto: quadro (artefato estilo Miro) onde as sessões deixam perguntas, alinhamentos, pendências e aprovações para responder fora do chat.",
   "author": { "name": "silRodrigo" }
 }

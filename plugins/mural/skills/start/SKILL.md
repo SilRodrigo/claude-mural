@@ -16,7 +16,10 @@ Use o mural para o que **pode esperar** (decisões, escolhas, aprovações). O q
 ## 1. Achar o mural do projeto
 O link fica na **memória do projeto**: procure em `MEMORY.md` uma linha "Mural …" e o arquivo que ela aponta.
 - **Achou:** use o `url` dele em todas as chamadas do Artifact.
-- **Não achou:** o projeto ainda não tem mural. **Ofereça criar** (seção 5), sem criar por conta própria.
+- **O usuário colou um link de mural** (`claude.ai/code/artifact/…`): use esse, mesmo que seja de outra conta (um mural compartilhado com ele). Grave o link na memória do projeto (passo 5 da seção 5) e **não crie outro mural**.
+- **Não achou:** pergunte se já existe um mural para este projeto (o link). Se não existir, **ofereça criar** (seção 5), sem criar por conta própria.
+
+**Mural de outra conta:** só funciona se o dono compartilhou a página com o usuário, pelo menu Compartilhar, com acesso de edição. Sem esse acesso, `read_db` pode até funcionar, mas `write_db` é recusado: avise o usuário e peça para ele pedir acesso ao dono. Nunca republique a página de um mural de outra conta (seção 6 é só para o dono).
 
 ## 2. Ler e aplicar respostas
 Faça isso no começo do trabalho e sempre que o usuário colar um aviso como `Respondi a P-03 no mural ("Sim"). Pode aplicar.`:
