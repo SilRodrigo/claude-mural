@@ -1,5 +1,5 @@
 <title>Mural {{PROJETO}}</title>
-<meta name="mural-versao" content="1.2.2">
+<meta name="mural-versao" content="1.3.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Fredoka:wght@500;600&family=JetBrains+Mono:wght@400;600&display=swap">
@@ -21,6 +21,7 @@
   --note-A: #CBE4F6;
   --note-T: #D4EAC3;
   --note-V: #FFD6BE;
+  --note-E: #FFFFFF;
   --note-line: rgba(42, 42, 32, 0.16);
   --st-open: #B5520F;
   --st-sent: #2462A8;
@@ -52,6 +53,7 @@
     --note-A: #22394A;
     --note-T: #2A3F25;
     --note-V: #4B3022;
+  --note-E: #3A3D3A;
     --note-line: rgba(241, 237, 224, 0.16);
     --st-open: #F5A35F;
     --st-sent: #7DB5F0;
@@ -79,6 +81,7 @@
   --note-A: #22394A;
   --note-T: #2A3F25;
   --note-V: #4B3022;
+  --note-E: #3A3D3A;
   --note-line: rgba(241, 237, 224, 0.16);
   --st-open: #F5A35F;
   --st-sent: #7DB5F0;
@@ -219,6 +222,7 @@ body.sem-selecao, body.sem-selecao * { user-select: none; -webkit-user-select: n
 .card.t-A { background: var(--note-A); }
 .card.t-T { background: var(--note-T); }
 .card.t-V { background: var(--note-V); }
+.card.na-entrada { background: var(--note-E); }
 .card.flash { animation: flash 1.2s ease-out 2; }
 @keyframes flash { 50% { box-shadow: 0 0 0 4px var(--accent), var(--shadow); } }
 @media (prefers-reduced-motion: reduce) { .card.flash { animation: none; outline: 3px solid var(--accent); } }
@@ -618,6 +622,23 @@ dialog textarea { min-height: 90px; resize: vertical; }
     { id: "V", nome: TIPOS.V.nome, desc: TIPOS.V.desc, sigla: "V-", x: 2420, y: 0, w: 640, h: 1700 },
   ];
   const ENTRADA = FRAMES[0];
+  // bx/bw = posição e largura "de base" (as de sempre). As posições salvas (layout e grupos) ficam nessa base.
+  // Na tela, cada área ajusta a largura ao maior item dela (mínimo: 2 cards; Entrada: 1) e as áreas à direita andam junto.
+  for (const f of FRAMES) { f.bx = f.x; f.bw = f.w; f.colW = 304; f.esq = 0; }
+  const MARGEM = 24, VAO_COL = 16, ESPACO = 40;
+  function frameBase(bx) {
+    let f = FRAMES[0];
+    for (const q of FRAMES) if (bx >= q.bx - ESPACO / 2) f = q;
+    return f;
+  }
+  function frameTela(tx) {
+    let f = FRAMES[0];
+    for (const q of FRAMES) if (tx >= q.x - ESPACO / 2) f = q;
+    return f;
+  }
+  function paraTela(bx) { const f = frameBase(bx); return bx + f.x + f.esq - f.bx; }
+  function paraBase(tx) { const f = frameTela(tx); return tx - (f.x + f.esq - f.bx); }
+  function posBase(p) { return { x: Math.round(paraBase(p.x)), y: Math.round(p.y) }; }
   const STATUS_TEXTO = {
     aberto: "Esperando você",
     respondido: "Com os agentes",
@@ -681,10 +702,12 @@ dialog textarea { min-height: 90px; resize: vertical; }
   }
   function verTudo() {
     const r = viewport.getBoundingClientRect();
-    const larg = 3060 + 80, alt = 1700 + 60;
+    const ult = FRAMES[FRAMES.length - 1];
+    const total = ult.x + ult.w;
+    const larg = total + 80, alt = 1700 + 60;
     const z = Math.min(1.2, Math.max(0.25, Math.min(r.width / larg, r.height / alt)));
     visao.z = z;
-    visao.x = (r.width - 3060 * z) / 2;
+    visao.x = (r.width - total * z) / 2;
     visao.y = 24;
     aplicarVisao();
   }
@@ -699,7 +722,7 @@ dialog textarea { min-height: 90px; resize: vertical; }
     const ng = nosGrupo.get(id);
     if (ng && estado.grupos.has(id)) {
       const g = estado.grupos.get(id);
-      centrarEm(g.x, g.y);
+      centrarEm(paraTela(g.x), g.y);
       elevarGrupo(id);
       return;
     }
@@ -866,26 +889,53 @@ dialog textarea { min-height: 90px; resize: vertical; }
   const posAuto = new Map();
   function posicao(id) {
     const l = estado.layout.get(id);
-    if (l && isFinite(l.x) && isFinite(l.y)) return { x: l.x, y: l.y };
+    if (l && isFinite(l.x) && isFinite(l.y)) return { x: paraTela(l.x), y: l.y };
     return posAuto.get(id) || { x: ENTRADA.x + 30, y: ENTRADA.y + 64 };
   }
   function areaDe(c) {
     const a = texto(c.area);
     return FRAMES.some((f) => f.id === a) ? a : ENTRADA.id;
   }
+  // Largura de cada área: 2 colunas (Entrada: 1) do tamanho do maior item dela, nunca menor que um card.
+  function ajustarFrames() {
+    // Cada coluna tem a largura do maior item dela, para a borda ficar igual dos dois lados.
+    // esq: a caixa da pilha começa antes da coluna; a borda conta a partir dela.
+    const larg = new Map(FRAMES.map((f) => [f.id, [CARD_W, CARD_W]]));
+    const esq = new Map(FRAMES.map((f) => [f.id, 0]));
+    for (const [gid, ng] of nosGrupo) {
+      const g = estado.grupos.get(gid);
+      if (!g || ng.raiz.classList.contains("hidden") || !ng.w) continue;
+      const f = frameBase(g.x);
+      const k = f.id !== ENTRADA.id && g.x - f.bx >= f.bw / 2 - 40 ? 1 : 0;
+      const cols = larg.get(f.id);
+      cols[k] = Math.max(cols[k], ng.w - GPAD);
+      if (k === 0) esq.set(f.id, Math.min(MARGEM, Math.max(esq.get(f.id), MARGEM - (g.x - f.bx))));
+    }
+    let x = FRAMES[0].bx;
+    for (const f of FRAMES) {
+      const [c1, c2] = larg.get(f.id);
+      f.colW = c1;
+      f.esq = esq.get(f.id);
+      f.w = f.esq + (f.id === ENTRADA.id ? 2 * MARGEM + c1 : 2 * MARGEM + c1 + VAO_COL + c2);
+      f.x = x;
+      x += f.w + ESPACO;
+      if (f.el) { f.el.style.left = f.x + "px"; f.el.style.width = f.w + "px"; }
+    }
+  }
   // caixas: área ocupada pelos grampos visíveis ({x, y, w, h}); cards automáticos não caem em cima delas.
   function empilhar(visiveis, caixas) {
     posAuto.clear();
     const fundo = new Map(FRAMES.map((f) => [f.id, 0]));
     for (const f of FRAMES) {
-      const colunas = f.id === ENTRADA.id ? [f.x + 30] : [f.x + 24, f.x + 336];
+      const c1 = f.x + f.esq + MARGEM;
+      const colunas = f.id === ENTRADA.id ? [c1] : [c1, c1 + f.colW + VAO_COL];
       const alturas = colunas.map(() => f.y + 64);
       for (const [id] of visiveis) {
         const l = estado.layout.get(id);
         const no = nos.get(id);
         if (!l || !no) continue;
         colunas.forEach((x, k) => {
-          if (Math.abs(l.x - x) < 280) alturas[k] = Math.max(alturas[k], l.y + no.raiz.offsetHeight + 18);
+          if (Math.abs(paraTela(l.x) - x) < 280) alturas[k] = Math.max(alturas[k], l.y + no.raiz.offsetHeight + 18);
         });
       }
       for (const b of caixas) {
@@ -907,11 +957,11 @@ dialog textarea { min-height: 90px; resize: vertical; }
       const l = estado.layout.get(id);
       const no = nos.get(id);
       if (!l || !no) continue;
-      const f = FRAMES.find((q) => l.x >= q.x && l.x < q.x + q.w);
+      const f = frameTela(paraTela(l.x));
       if (f) fundo.set(f.id, Math.max(fundo.get(f.id), l.y + no.raiz.offsetHeight + 18));
     }
     for (const b of caixas) {
-      const f = FRAMES.find((q) => b.x >= q.x && b.x < q.x + q.w);
+      const f = frameTela(b.x);
       if (f) fundo.set(f.id, Math.max(fundo.get(f.id), b.y + b.h + 18));
     }
     const alto = Math.max(1700, ...[...fundo.values()].map((y) => y + 40));
@@ -1245,6 +1295,8 @@ dialog textarea { min-height: 90px; resize: vertical; }
         if (ver) soltos.push([id, c]);
       }
     }
+    montarGrupos(); // 1ª passada: mede as pilhas
+    ajustarFrames();
     const { caixas, posGrupo } = montarGrupos();
     empilhar(soltos, caixas);
     for (const [id] of estado.cards) {
@@ -1253,6 +1305,7 @@ dialog textarea { min-height: 90px; resize: vertical; }
       const no = nos.get(id);
       no.raiz.style.left = p.x + "px";
       no.raiz.style.top = p.y + "px";
+      no.raiz.classList.toggle("na-entrada", frameTela(p.x) === ENTRADA);
     }
     atualizarSelecao();
     for (const k of Object.keys(contagem)) $("#n-" + k).textContent = contagem[k];
@@ -1406,13 +1459,14 @@ dialog textarea { min-height: 90px; resize: vertical; }
         no.raiz.style.height = "";
         no.altura = no.raiz.offsetHeight;
       }
+      const gx = paraTela(g.x);
       let w, h;
       if (g.aberto) {
         let y = g.y + GH;
         membros.forEach((id, k) => {
           const no = nos.get(id);
           no.camada = k;
-          posGrupo.set(id, { x: g.x + GPAD, y });
+          posGrupo.set(id, { x: gx + GPAD, y });
           y += no.altura + 12;
         });
         w = CARD_W + 2 * GPAD;
@@ -1424,7 +1478,7 @@ dialog textarea { min-height: 90px; resize: vertical; }
           const no = nos.get(id);
           no.camada = k;
           if (k > atras) { no.raiz.classList.add("enterrado"); return; }
-          posGrupo.set(id, { x: g.x + GPAD + k * OFF, y: g.y + GH + k * OFF });
+          posGrupo.set(id, { x: gx + GPAD + k * OFF, y: g.y + GH + k * OFF });
           if (k > 0) { no.raiz.classList.add("atras"); no.raiz.style.height = topo.altura + "px"; }
         });
         w = CARD_W + 2 * GPAD + atras * OFF;
@@ -1432,7 +1486,7 @@ dialog textarea { min-height: 90px; resize: vertical; }
       }
       ng.w = w;
       ng.h = h;
-      ng.raiz.style.left = g.x + "px";
+      ng.raiz.style.left = gx + "px";
       ng.raiz.style.top = g.y + "px";
       ng.raiz.style.width = w + "px";
       ng.raiz.style.height = h + "px";
@@ -1448,7 +1502,7 @@ dialog textarea { min-height: 90px; resize: vertical; }
       for (const b of [ng.btnArq, ng.btnSoltar]) b.disabled = !estado.podeEscrever;
       ng.titulo.readOnly = !estado.podeEscrever;
       aplicarZGrupo(gid);
-      caixas.push({ x: g.x, y: g.y, w, h });
+      caixas.push({ x: gx, y: g.y, w, h });
     }
     return { caixas, posGrupo };
   }
@@ -1504,8 +1558,8 @@ dialog textarea { min-height: 90px; resize: vertical; }
     if (!g) return;
     const existentes = resto.filter((x) => estado.cards.has(x));
     if (existentes.length >= 2) { gravarGrupo(gid, Object.assign({}, g, { ids: resto })); return; }
-    const reserva = { x: g.x + GPAD, y: g.y + GH };
-    for (const x of existentes) gravarLayout(x, posAtual(x, reserva));
+    const reserva = { x: paraTela(g.x) + GPAD, y: g.y + GH };
+    for (const x of existentes) gravarLayout(x, posBase(posAtual(x, reserva)));
     gravarGrupo(gid, null);
   }
   // Põe os cards no topo do grupo destino ({gid}) ou num grupo novo ({x, y}). Devolve o id do grupo.
@@ -1525,7 +1579,7 @@ dialog textarea { min-height: 90px; resize: vertical; }
     // Não deixa o cabeçalho da pilha nova cobrir o nome da área.
     const f = FRAMES.find((q) => destino.x + GPAD >= q.x && destino.x < q.x + q.w);
     const y = f ? Math.max(destino.y, f.y + 48) : destino.y;
-    gravarGrupo(gid, { id: gid, titulo: "", ids: lista, x: Math.round(destino.x), y: Math.round(y), aberto: false, criadoEm: new Date().toISOString() });
+    gravarGrupo(gid, { id: gid, titulo: "", ids: lista, x: Math.round(paraBase(destino.x)), y: Math.round(y), aberto: false, criadoEm: new Date().toISOString() });
     return gid;
   }
   // Card que sai do grampo pelo botão volta para a área dele (empilhamento automático, sem sobrepor nada).
@@ -1684,10 +1738,10 @@ dialog textarea { min-height: 90px; resize: vertical; }
         terminar(`${ent.grupo} juntado em ${alvo.gid}.`);
       } else if (alvo && alvo.tipo === "novo") {
         comecar();
-        gravarGrupo(ent.grupo, Object.assign({}, g, { x, y, ids: [...g.ids, alvo.card] }));
+        gravarGrupo(ent.grupo, Object.assign({}, g, posBase({ x, y }), { ids: [...g.ids, alvo.card] }));
         terminar(`${alvo.card} grampeado em ${ent.grupo}.`);
       } else {
-        gravarGrupo(ent.grupo, Object.assign({}, g, { x, y }));
+        gravarGrupo(ent.grupo, Object.assign({}, g, posBase({ x, y })));
         renderizar();
       }
       return;
@@ -1715,10 +1769,10 @@ dialog textarea { min-height: 90px; resize: vertical; }
     } else if (origem) {
       comecar();
       aplicarResto(origem, estado.grupos.get(origem).ids.filter((x) => x !== id));
-      gravarLayout(id, { x, y });
+      gravarLayout(id, posBase({ x, y }));
       terminar(`${id} saiu do grampo ${origem}.`);
     } else {
-      gravarLayout(id, { x, y });
+      gravarLayout(id, posBase({ x, y }));
       renderizar();
     }
   }
@@ -1727,7 +1781,8 @@ dialog textarea { min-height: 90px; resize: vertical; }
     const ng = nosGrupo.get(gid);
     if (!g || !ng) return true;
     const cx = x + CARD_W / 2, cy = y + 30;
-    return cx < g.x || cx > g.x + ng.w || cy < g.y || cy > g.y + ng.h;
+    const gx = paraTela(g.x);
+    return cx < gx || cx > gx + ng.w || cy < g.y || cy > g.y + ng.h;
   }
 
   // ---- seleção ----
