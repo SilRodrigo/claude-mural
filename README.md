@@ -7,7 +7,7 @@ Plugin do Claude Code com a skill **mural**: cada projeto ganha um quadro (artef
 - Acesso a este repositório (é privado): o git da máquina precisa estar logado no GitHub.
 
 ## Instalar
-No Claude Code:
+No Claude Code (depois, chame com `/mural:start`):
 ```
 /plugin marketplace add SilRodrigo/claude-mural
 /plugin install mural@claude-mural
@@ -37,7 +37,7 @@ Atualizar o plugin não muda os murais já publicados. A skill compara a versão
 ```
 .claude-plugin/marketplace.json
 plugins/mural/.claude-plugin/plugin.json
-plugins/mural/skills/mural/SKILL.md          ← protocolo
-plugins/mural/skills/mural/modelo-mural.html ← página do mural
+plugins/mural/skills/start/SKILL.md          ← protocolo
+plugins/mural/skills/start/modelo-mural.html ← página do mural
 ```
 Ao mudar o modelo, suba `mural-versao` (no HTML) e `version` (no `plugin.json`) juntas.

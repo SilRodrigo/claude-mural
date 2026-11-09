@@ -1,5 +1,5 @@
 ---
-name: mural
+name: start
 description: Mural do projeto — quadro (artefato estilo Miro) onde as sessões deixam perguntas, alinhamentos, pendências e aprovações para o usuário responder fora do chat. Use quando: for perguntar algo ao usuário que pode esperar (decisão, escolha, aprovação visual, pendência); o usuário colar "Respondi a P-03 no mural…" ou disser "vê o mural"; começar a trabalhar num projeto cuja memória aponta um mural (ler os cards respondidos); o usuário pedir um mural para um projeto que ainda não tem; ou for atualizar um mural com o modelo novo.
 ---
 
