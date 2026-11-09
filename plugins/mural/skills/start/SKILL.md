@@ -20,13 +20,13 @@ O link fica na **memória do projeto**: procure em `MEMORY.md` uma linha "Mural 
 
 ## 2. Ler e aplicar respostas
 Faça isso no começo do trabalho e sempre que o usuário colar um aviso como `Respondi a P-03 no mural ("Sim"). Pode aplicar.`:
-1. Leia os cards respondidos: Artifact `read_db`, `db_op: "query"`, `collection: "cards"`, `query: {"where": [["status", "==", "respondido"]]}`. Com um ID colado, `db_op: "get"` com `doc_id`.
+1. Leia os cards respondidos: `ArtifactData`, `action: "query"`, `collection: "cards"`, `query: {"where": [["status", "==", "respondido"]]}`. Com um ID colado, `action: "get"` com `doc_id`.
 2. Aplique o que foi decidido, só o que é da sua sessão (`origem`/`sessaoId`) ou do seu trabalho. O resto, deixe para a sessão certa.
-3. Feche o card: `write_db`, `db_op: "update"` (**nunca** `set`, que apaga campos), com `{"status": "aplicado", "nota": "<o que foi feito, em uma frase>"}`.
+3. Feche o card: `ArtifactData`, `action: "update"` (**nunca** `set`, que apaga campos), com `{"status": "aplicado", "nota": "<o que foi feito, em uma frase>"}`.
 
 ## 3. Abrir um card
-1. Escolha o tipo e o próximo ID livre: leia `cards` e use o maior número daquele prefixo + 1, com 2 dígitos (`P-04`, `T-02`).
-2. `write_db`, `db_op: "set"`, `collection: "cards"`, `doc_id: "<ID>"`, com os campos abaixo e `status: "aberto"`.
+1. Escolha o tipo e o próximo ID livre: `ArtifactData`, `action: "list"`, `collection: "cards"`, `query: {"limit": 1000}`, com `out_dir`. O resultado traz só os IDs e as versões, sem o conteúdo dos cards. Use o maior número daquele prefixo + 1, com 2 dígitos (`P-04`, `T-02`).
+2. `ArtifactData`, `action: "set"`, `collection: "cards"`, `doc_id: "<ID>"`, com os campos abaixo e `status: "aberto"`.
 3. **Contexto auto-explicativo:** outra sessão, sem o seu histórico, tem que entender e aplicar a resposta. Ponha o trecho de código em `codigo` quando ajudar.
    - **Teste antes de gravar:** releia o card como se fosse uma sessão nova. Sem o seu histórico, ela entende o que está sendo pedido e o que acontece com cada resposta? Se não, reescreva.
 4. **Prefira `opcoes` (botões)** a resposta livre: fica menos aberto a interpretação.
@@ -60,17 +60,27 @@ Faça isso no começo do trabalho e sempre que o usuário colar um aviso como `R
 1. Carregue as skills `artifact-design` e `artifact-capabilities`, como a ferramenta Artifact exige antes de publicar.
 2. Copie `modelo-mural.html` (nesta pasta da skill) para o scratchpad como `mural.html` e troque `{{PROJETO}}` pelo nome do projeto (aparece 2 vezes: `<title>` e `<h1>`).
 3. Publique: Artifact com `file_path` dessa cópia, `icon: "board"`, `capabilities: {"db": {}, "user": {}}` e `description` "Mural do projeto <nome>: perguntas, alinhamentos, pendências e aprovações das sessões".
-4. Crie com `write_db` `batch` só cards reais: o que estiver em aberto de verdade naquele momento, mais um `A-01` "Como conversamos: mural para perguntas, chat para dúvidas", com `status: "aplicado"`. Não invente exemplos.
-5. Grave na memória do projeto um arquivo `mural-<projeto>.md` (tipo `reference`) com o link e "protocolo: skill mural", e uma linha no `MEMORY.md`.
-6. Confira uma vez com `read_db` e entregue o link ao usuário.
+4. Crie com `ArtifactData` `action: "batch"` só cards reais: o que estiver em aberto de verdade naquele momento, mais um `A-01` "Como conversamos: mural para perguntas, chat para dúvidas", com `status: "aplicado"`. Não invente exemplos.
+5. Grave na memória do projeto um arquivo `mural-<projeto>.md` (tipo `reference`) com o link, "protocolo: skill mural" e `modelo: <mural-versao>` (a da `<meta name="mural-versao">` do `modelo-mural.html` publicado), e uma linha no `MEMORY.md`.
+6. Confira uma vez com `ArtifactData` (`action: "list"`) e entregue o link ao usuário.
 
 ## 6. Atualizar um mural com o modelo novo
-O modelo vem com o plugin `mural`. Quando o plugin é atualizado, os murais já publicados continuam na versão antiga. Para saber, compare a `<meta name="mural-versao">` do mural (Artifact `read`) com a de `modelo-mural.html`. Se o mural for mais antigo (ou não tiver essa meta), **ofereça** atualizar; só atualize com o ok do usuário:
+O modelo vem com o plugin `mural`. Quando o plugin é atualizado, os murais já publicados continuam na versão antiga. Para saber, compare o `modelo:` da memória do mural com a `<meta name="mural-versao">` do `modelo-mural.html`, lida por `grep` no arquivo local, sem ler a página do mural. Se a memória for mais antiga (ou não tiver `modelo:`), **ofereça** atualizar; só atualize com o ok do usuário:
 1. Artifact `action: "read"` com o `url` do mural (confirma que o usuário pode editar).
 2. Faça a cópia do modelo com o nome do projeto (passo 2 da seção 5).
 3. Publique com `url` do mural, sem `icon`, sem `capabilities` (ficam as que já estavam).
+4. Atualize o `modelo:` da memória do mural para a versão publicada.
 
 Os cards ficam nos dados, não na página: atualizar não perde nada. Atualizar o plugin **não** atualiza os murais existentes: cada um é republicado à parte. Ao mudar o modelo, suba a `mural-versao` junto com a `version` do `plugin.json`.
+
+## 7. Gastar pouco
+Cada leitura entra no contexto da sessão. Leia só o necessário:
+- **Não leia `cards` inteiro com o conteúdo.** Para saber os IDs, use `list` com `out_dir` (seção 3, passo 1).
+- **Estado vivo:** `action: "query"` com `where: [["status", "in", ["aberto", "respondido"]]]`. Os cards aplicados e arquivados ficam de fora.
+- **Card novo de outra sessão:** `list` com `out_dir`, compare os IDs com os que você já conhece e dê `get` só nos novos.
+- **Ao gravar,** passe o `version` lido como `if_version`, sem reler o card antes.
+- **Não leia a página do mural** (Artifact `read`, ~78 KB) fora da seção 6.
+- **Checagem agendada** (tarefa que relê o mural) só enquanto espera uma resposta, com intervalo de 15 min ou mais, e apagada ao terminar.
 
 ## Limites conhecidos
 - Feito para **desktop**: arrastar, zoom com a roda do mouse, cards arrastados pela faixa do ID.
