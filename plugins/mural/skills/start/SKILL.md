@@ -22,10 +22,10 @@ O link fica na **memória do projeto**: procure em `MEMORY.md` uma linha "Mural 
 Faça isso no começo do trabalho e sempre que o usuário colar um aviso como `Respondi a P-03 no mural ("Sim"). Pode aplicar.`:
 1. Leia os cards respondidos: `ArtifactData`, `action: "query"`, `collection: "cards"`, `query: {"where": [["status", "==", "respondido"]]}`. Com um ID colado, `action: "get"` com `doc_id`.
 2. Aplique o que foi decidido, só o que é da sua sessão (`origem`/`sessaoId`) ou do seu trabalho. O resto, deixe para a sessão certa.
-3. Feche o card: `ArtifactData`, `action: "update"` (**nunca** `set`, que apaga campos), com `{"status": "aplicado", "nota": "<o que foi feito, em uma frase>"}`.
+3. Feche o card: `ArtifactData`, `action: "update"` (**nunca** `set`, que apaga campos), com o `version` lido no passo 1 como `if_version` e com `{"status": "aplicado", "nota": "<o que foi feito, em uma frase>"}`.
 
 ## 3. Abrir um card
-1. Escolha o tipo e o próximo ID livre: `ArtifactData`, `action: "list"`, `collection: "cards"`, `query: {"limit": 1000}`, com `out_dir`. O resultado traz só os IDs e as versões, sem o conteúdo dos cards. Use o maior número daquele prefixo + 1, com 2 dígitos (`P-04`, `T-02`).
+1. Escolha o tipo e o próximo ID livre: `ArtifactData`, `action: "list"`, `collection: "cards"`, `query: {"limit": 1000}`, com `out_dir` no scratchpad da sessão. O resultado traz só os IDs e as versões, sem o conteúdo dos cards. Use o maior número daquele prefixo + 1, com 2 dígitos (`P-04`, `T-02`).
 2. `ArtifactData`, `action: "set"`, `collection: "cards"`, `doc_id: "<ID>"`, com os campos abaixo e `status: "aberto"`.
 3. **Contexto auto-explicativo:** outra sessão, sem o seu histórico, tem que entender e aplicar a resposta. Ponha o trecho de código em `codigo` quando ajudar.
    - **Teste antes de gravar:** releia o card como se fosse uma sessão nova. Sem o seu histórico, ela entende o que está sendo pedido e o que acontece com cada resposta? Se não, reescreva.
@@ -79,7 +79,7 @@ Cada leitura entra no contexto da sessão. Leia só o necessário:
 - **Estado vivo:** `action: "query"` com `where: [["status", "in", ["aberto", "respondido"]]]`. Os cards aplicados e arquivados ficam de fora.
 - **Card novo de outra sessão:** `list` com `out_dir`, compare os IDs com os que você já conhece e dê `get` só nos novos.
 - **Ao gravar,** passe o `version` lido como `if_version`, sem reler o card antes.
-- **Não leia a página do mural** (Artifact `read`, ~78 KB) fora da seção 6.
+- **Não leia a página do mural** (Artifact `read`; a página é grande) fora da seção 6.
 - **Checagem agendada** (tarefa que relê o mural) só enquanto espera uma resposta, com intervalo de 15 min ou mais, e apagada ao terminar.
 
 ## Limites conhecidos
