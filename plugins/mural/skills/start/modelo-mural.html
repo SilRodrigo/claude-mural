@@ -1,5 +1,5 @@
 <title>Mural {{PROJETO}}</title>
-<meta name="mural-versao" content="1.4.1">
+<meta name="mural-versao" content="1.5.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Fredoka:wght@500;600&family=JetBrains+Mono:wght@400;600&display=swap">
@@ -568,7 +568,8 @@ dialog textarea { min-height: 90px; resize: vertical; }
 </header>
 
 <div class="colab-barra hidden" id="colab-barra" role="note">
-  <span>Você pode responder nos cards marcados <b>“para você”</b>. O resto do mural é só leitura.</span>
+  <span id="colab-texto">Você é convidado neste mural: crie cards em <b>Novo card</b>, edite os seus e responda os liberados para você. Os cards do dono são só leitura.</span>
+  <button class="btn primary hidden" type="button" id="colab-entrar">Entrar como convidado</button>
   <button class="btn" type="button" id="colab-instrucoes">Copiar instruções para o seu agente</button>
 </div>
 <main class="viewport" id="viewport" aria-label="Quadro de cards">
@@ -691,6 +692,7 @@ dialog textarea { min-height: 90px; resize: vertical; }
     respostas: new Map(), // id do colaborador -> Map(card -> resposta)  (só o dono/editores leem)
     minhas: new Map(),    // card -> a minha resposta de colaborador
     nomes: new Map(),     // id -> nome (resolvido na hora; nunca gravado)
+    convidados: new Set(), // ids de quem entrou como convidado (convidados/<id>)
   };
   const nos = new Map();
   const nosGrupo = new Map();
@@ -905,12 +907,29 @@ dialog textarea { min-height: 90px; resize: vertical; }
     filas.set(caminho, proxima);
     return proxima;
   }
+  // Chave de um card na página: "P-01" (card do dono) ou "<id do convidado>~P-01" (card criado por um convidado).
+  function partes(chave) {
+    const i = chave.indexOf("~");
+    return i < 0 ? { uid: null, id: chave } : { uid: chave.slice(0, i), id: chave.slice(i + 1) };
+  }
+  function colecaoDe(uid) { return uid ? "convidados/" + uid + "/cards" : "cards"; }
+  function semLocais(d) { const o = Object.assign({}, d); delete o._dono; delete o._id; return o; }
   function atualizarCard(id, dados) {
     if (!estado.db) { toast("O mural ainda não conectou."); return; }
     const local = estado.cards.get(id);
     if (local) estado.cards.set(id, Object.assign({}, local, dados));
     renderizar();
-    return escrever("cards/" + id, () => estado.db.collection("cards").doc(id).update(dados));
+    const { uid, id: doc } = partes(id);
+    const col = colecaoDe(uid);
+    return escrever(col + "/" + doc, () => estado.db.collection(col).doc(doc).update(semLocais(dados)));
+  }
+  // Quem mexe num card: o dono do mural em todos; o convidado só nos que ele criou.
+  function podeMexer(c) { return estado.podeEscrever || (!!c && !!c._dono && c._dono === estado.meuId); }
+  function rotulo(chave) {
+    const { uid, id } = partes(chave);
+    if (!uid) return id;
+    const nome = uid === estado.meuId ? "você" : estado.nomes.get(uid) || "convidado";
+    return nome + "/" + id;
   }
 
   // ---------- posições ----------
@@ -1152,7 +1171,8 @@ dialog textarea { min-height: 90px; resize: vertical; }
     const tipo = TIPOS[c.tipo] ? c.tipo : "P";
     const status = STATUS_TEXTO[c.status] ? c.status : "aberto";
     no.raiz.className = "card t-" + tipo + (no.raiz.classList.contains("flash") ? " flash" : "");
-    no.cid.textContent = id;
+    no.cid.textContent = rotulo(id);
+    const pode = podeMexer(c);
     no.pill.className = "pill st-" + status;
     const itens = Array.isArray(c.itens) ? c.itens : [];
     if (itens.length && status !== "arquivado") {
@@ -1176,7 +1196,7 @@ dialog textarea { min-height: 90px; resize: vertical; }
       b.className = "opt";
       b.textContent = o;
       b.setAttribute("aria-pressed", String(ehColab ? !!minha && minha.resposta === o : c.resposta === o));
-      b.disabled = !estado.podeEscrever && !ehColab;
+      b.disabled = !pode && !ehColab;
       b.addEventListener("click", () => (ehColab ? responderColab(id, o) : responder(id, o)));
       return b;
     }));
@@ -1188,7 +1208,7 @@ dialog textarea { min-height: 90px; resize: vertical; }
       cb.type = "checkbox";
       cb.id = `item-${id}-${i}`;
       cb.checked = !!(item && item.feito);
-      cb.disabled = !estado.podeEscrever;
+      cb.disabled = !pode;
       const sp = document.createElement("span");
       sp.textContent = texto(item && item.texto);
       lab.htmlFor = cb.id;
@@ -1211,7 +1231,7 @@ dialog textarea { min-height: 90px; resize: vertical; }
       b.setAttribute("aria-pressed", String(enviado));
       b.addEventListener("click", () => enviarComentarioColab(id, enviado));
       no.respRow.append(b);
-    } else if (estado.podeEscrever && !opcoes.length && tipo !== "T" && (status === "aberto" || status === "respondido")) {
+    } else if (pode && !opcoes.length && tipo !== "T" && (status === "aberto" || status === "respondido")) {
       const b = document.createElement("button");
       b.type = "button";
       b.className = "opt";
@@ -1233,11 +1253,12 @@ dialog textarea { min-height: 90px; resize: vertical; }
     no.nota.classList.toggle("hidden", !notaTexto);
 
     no.avisar.classList.toggle("hidden", status !== "respondido" || !estado.podeEscrever);
-    no.liberar.classList.toggle("hidden", !estado.podeEscrever || !estado.user);
+    no.liberar.classList.toggle("hidden", !estado.podeEscrever || !estado.user || !!c._dono);
     if (status !== "respondido") no.copia.classList.add("hidden");
 
     const partes = [];
-    if (texto(c.origem)) partes.push("aberto por " + c.origem);
+    if (c._dono) partes.push("criado por " + (c._dono === estado.meuId ? "você" : estado.nomes.get(c._dono) || "convidado"));
+    else if (texto(c.origem)) partes.push("aberto por " + c.origem);
     if (c.respondidoPor) {
       const rp = String(c.respondidoPor);
       const quem = rp === estado.meuId ? "você" : estado.nomes.get(rp) || "outra pessoa";
@@ -1246,9 +1267,9 @@ dialog textarea { min-height: 90px; resize: vertical; }
     if (texto(c.respondidoEm)) partes.push(dataCurta(c.respondidoEm));
     no.meta.textContent = partes.join(" · ");
     no.arq.textContent = status === "arquivado" ? "Desarquivar" : "Arquivar";
-    no.arq.disabled = !estado.podeEscrever;
-    no.arq.classList.toggle("hidden", !estado.podeEscrever);
-    no.ta.readOnly = !estado.podeEscrever && !ehColab;
+    no.arq.disabled = !pode;
+    no.arq.classList.toggle("hidden", !pode);
+    no.ta.readOnly = !pode && !ehColab;
   }
 
   // ---------- colaboradores ----------
@@ -1370,7 +1391,7 @@ dialog textarea { min-height: 90px; resize: vertical; }
     lista.className = "lista";
     const dica = document.createElement("div");
     dica.className = "para";
-    dica.textContent = "Só aparecem colegas da sua organização: quem é de outra organização só lê o mural.";
+    dica.textContent = "Aparecem os colegas da sua organização e quem já entrou como convidado.";
     const fechar = document.createElement("button");
     fechar.type = "button";
     fechar.className = "link";
@@ -1378,7 +1399,13 @@ dialog textarea { min-height: 90px; resize: vertical; }
     fechar.addEventListener("click", () => alternarPicker(id));
     const buscar = async () => {
       if (!estado.user) return;
-      const hits = await estado.user.search(campo.value);
+      const q = campo.value.trim().toLowerCase();
+      const daOrg = await estado.user.search(campo.value);
+      // Convidados (inclusive de outra organização) entram na lista depois de "Entrar como convidado".
+      const conv = [...estado.convidados].filter((u) => u !== estado.meuId && !daOrg.some((h) => h.id === u))
+        .map((u) => ({ id: u, name: (estado.nomes.get(u) || "Convidado sem nome visível") + " (convidado)", isMe: false }))
+        .filter((h) => !q || h.name.toLowerCase().includes(q));
+      const hits = daOrg.concat(conv);
       const ja = new Set(paraDe(estado.cards.get(id) || {}));
       lista.replaceChildren(...hits.filter((h) => !h.isMe && !ja.has(h.id)).map((h) => {
         estado.nomes.set(h.id, h.name);
@@ -1395,7 +1422,7 @@ dialog textarea { min-height: 90px; resize: vertical; }
         });
         return b;
       }));
-      if (campo.value && !lista.children.length) lista.textContent = "Ninguém encontrado na sua organização.";
+      if (campo.value && !lista.children.length) lista.textContent = "Ninguém encontrado. Quem é de fora aparece aqui depois de entrar como convidado.";
     };
     campo.addEventListener("input", buscar);
     campo.addEventListener("focus", buscar);
@@ -1450,10 +1477,12 @@ dialog textarea { min-height: 90px; resize: vertical; }
   }
   function textoInstrucoes() {
     return [
-      "Mural de outra pessoa, compartilhado comigo. Protocolo (skill mural, seção 8 \"Colaborador\"):",
+      "Mural de outra pessoa, compartilhado comigo. Protocolo (skill mural, seção 8 \"Convidados\"):",
       `- Meu id neste mural: ${estado.meuId}`,
       `- Meus cards: ArtifactData action "query", collection "cards", query {"where": [["para", "array-contains", "${estado.meuId}"]]}.`,
       "- Responder: ArtifactData action \"set\", collection \"data/users/me\", doc_id \"<ID do card>\", com {\"card\": \"<ID>\", \"resposta\": \"<texto ou opção>\", \"comentario\": \"\", \"status\": \"respondido\", \"respondidoEm\": \"<ISO>\"}.",
+      `- Criar card meu: ArtifactData action "set", collection "convidados/${estado.meuId}/cards", doc_id "<TIPO>-<NN>" (P, A, T ou V; o próximo número entre os meus), com {"id", "tipo", "titulo", "contexto", "opcoes", "itens", "status": "aberto", "origem": "convidado", "criadoEm"}. Editar: action "update" no mesmo lugar.`,
+      `- Antes do primeiro card: ArtifactData action "set", collection "convidados", doc_id "${estado.meuId}", com {"desde": "<ISO>"}.`,
       "- Não escrevo em cards/, layout/ ou grupos/ (são do dono). O progresso aparece nos itens do card.",
     ].join("\n");
   }
@@ -1466,7 +1495,7 @@ dialog textarea { min-height: 90px; resize: vertical; }
 
   function responder(id, opcao) {
     const c = estado.cards.get(id);
-    if (!c || !estado.podeEscrever) return;
+    if (!c || !podeMexer(c)) return;
     if (c.resposta === opcao) {
       atualizarCard(id, { resposta: null, status: "aberto", respondidoPor: null, respondidoEm: null });
     } else {
@@ -1488,15 +1517,19 @@ dialog textarea { min-height: 90px; resize: vertical; }
   function textoAviso(id, c) {
     const resp = texto(c.resposta);
     const curta = resp.length > 80 ? resp.slice(0, 77) + "…" : resp;
-    return `Respondi a ${id} no mural${curta ? ` ("${curta}")` : ""}. Pode aplicar.`;
+    const { uid, id: doc } = partes(id);
+    const qual = uid ? `${doc} do convidado (convidados/${uid}/cards/${doc})` : id;
+    return `Respondi a ${qual} no mural${curta ? ` ("${curta}")` : ""}. Pode aplicar.`;
   }
   // Clique (sem arrastar) no ID do card copia o ID.
   async function copiarId(id) {
+    const { uid, id: doc } = partes(id);
+    const txt = uid ? `${doc} (card de convidado: convidados/${uid}/cards/${doc})` : id;
     try {
-      await navigator.clipboard.writeText(id);
-      toast(`${id} copiado.`);
+      await navigator.clipboard.writeText(txt);
+      toast(`${rotulo(id)} copiado.`);
     } catch (_) {
-      toast(`Não consegui copiar. O ID é ${id}.`);
+      toast(`Não consegui copiar. O ID é ${rotulo(id)}.`);
     }
   }
   async function copiarAviso(id) {
@@ -1562,7 +1595,7 @@ dialog textarea { min-height: 90px; resize: vertical; }
     for (const [id, c] of estado.cards) {
       const no = nos.get(id) || criarNo(id);
       const resp = paraDe(c).map((u) => [u, (estado.respostas.get(u) || new Map()).get(id) || null, estado.nomes.get(u) || ""]);
-      const assinatura = JSON.stringify([c, estado.meuId, estado.podeEscrever, estado.minhas.get(id) || null, resp, estado.nomes.get(c.respondidoPor) || ""]);
+      const assinatura = JSON.stringify([c, estado.meuId, estado.podeEscrever, estado.minhas.get(id) || null, resp, estado.nomes.get(c.respondidoPor) || "", estado.nomes.get(c._dono) || ""]);
       if (assinatura !== no.assinatura) { preencherNo(id, c, no); no.assinatura = assinatura; }
       const status = statusDe(c);
       contagem[status]++;
@@ -2138,14 +2171,20 @@ dialog textarea { min-height: 90px; resize: vertical; }
     const titulo = $("#novo-titulo-campo").value.trim();
     if (!titulo) return;
     const lista = $("#novo-opcoes").value.split(",").map((s) => s.trim()).filter(Boolean).slice(0, 12);
+    // Dono numera entre os cards dele; convidado, entre os que ele criou.
+    const meu = estado.podeEscrever ? null : estado.meuId;
+    if (!estado.podeEscrever && !meu) { toast("Abra o mural com a sua conta do claude.ai para criar cards."); return; }
     let maior = 0;
-    for (const id of estado.cards.keys()) {
-      const m = new RegExp("^" + tipo + "-(\\d+)$").exec(id);
+    for (const [chave, c] of estado.cards) {
+      const { uid, id: doc } = partes(chave);
+      if ((uid || null) !== meu) continue;
+      const m = new RegExp("^" + tipo + "-(\\d+)$").exec(doc);
       if (m) maior = Math.max(maior, parseInt(m[1], 10));
     }
-    const id = `${tipo}-${String(maior + 1).padStart(2, "0")}`;
+    const doc = `${tipo}-${String(maior + 1).padStart(2, "0")}`;
+    const id = meu ? meu + "~" + doc : doc;
     const dados = {
-      id,
+      id: doc,
       tipo,
       titulo,
       contexto: $("#novo-contexto").value.trim(),
@@ -2155,14 +2194,16 @@ dialog textarea { min-height: 90px; resize: vertical; }
       comentario: "",
       status: "aberto",
       nota: "",
-      origem: "você",
+      origem: meu ? "convidado" : "você",
       criadoEm: new Date().toISOString(),
     };
-    estado.cards.set(id, dados);
+    if (meu) entrarComoConvidado(true);
+    estado.cards.set(id, meu ? Object.assign({ _dono: meu, _id: doc }, dados) : dados);
     renderizar();
-    escrever("cards/" + id, () => estado.db.collection("cards").doc(id).set(dados));
+    const col = colecaoDe(meu);
+    escrever(col + "/" + doc, () => estado.db.collection(col).doc(doc).set(dados));
     dlgNovo.close();
-    toast(`Card ${id} criado na Entrada.`);
+    toast(`Card ${rotulo(id)} criado na Entrada.`);
     irPara(id);
   });
 
@@ -2191,6 +2232,35 @@ dialog textarea { min-height: 90px; resize: vertical; }
     toastTimer = setTimeout(() => toastEl.classList.add("hidden"), opc ? 10000 : 3200);
   }
 
+  // Cards criados por um convidado: convidados/<id>/cards/<ID>. Todos leem; só ele e o dono escrevem.
+  const ouvindoConv = new Set();
+  function ouvirCardsDe(uid) {
+    if (!estado.db || ouvindoConv.has(uid) || ouvindoConv.size >= 40) return;
+    ouvindoConv.add(uid);
+    estado.db.collection(colecaoDe(uid)).onSnapshot((snap) => {
+      for (const ch of snap.docChanges()) {
+        const chave = uid + "~" + ch.doc.id;
+        if (ch.type === "removed") estado.cards.delete(chave);
+        else estado.cards.set(chave, Object.assign({}, ch.doc.data() || {}, { _dono: uid, _id: ch.doc.id }));
+      }
+      renderizar();
+    }, () => {});
+  }
+  function atualizarBarra() {
+    const conv = !estado.podeEscrever && !!estado.meuId;
+    $("#colab-barra").classList.toggle("hidden", !conv);
+    $("#colab-entrar").classList.toggle("hidden", !conv || estado.convidados.has(estado.meuId));
+  }
+  function entrarComoConvidado(calado) {
+    if (!estado.db || !estado.meuId || estado.podeEscrever || estado.convidados.has(estado.meuId)) return;
+    const uid = estado.meuId;
+    estado.convidados.add(uid);
+    ouvirCardsDe(uid);
+    atualizarBarra();
+    escrever("convidados/" + uid, () => estado.db.collection("convidados").doc(uid).set({ desde: new Date().toISOString() }));
+    if (!calado) toast("Pronto: o dono já pode liberar cards para você.");
+  }
+  $("#colab-entrar").addEventListener("click", () => entrarComoConvidado(false));
   $("#colab-instrucoes").addEventListener("click", async () => {
     try { await navigator.clipboard.writeText(textoInstrucoes()); toast("Instruções copiadas. Cole no chat do seu agente."); }
     catch (_) { toast("Não consegui copiar. Tente de novo."); }
@@ -2212,9 +2282,23 @@ dialog textarea { min-height: 90px; resize: vertical; }
     if (user) {
       estado.user = user;
       try { estado.meuId = await user.id(); } catch (_) {}
-      try { const pode = await user.can("data.write"); if (pode === false) estado.podeEscrever = false; } catch (_) {}
+      // Desde a 1.5.0 só o dono escreve nos dados compartilhados (Editores de fora também são convidados).
+      try { estado.podeEscrever = await user.isOwner(); } catch (_) {}
     }
-    if (!estado.podeEscrever) $("#abrir-novo").classList.add("hidden");
+    if (!estado.podeEscrever && !estado.meuId) $("#abrir-novo").classList.add("hidden");
+    atualizarBarra();
+    db.collection("convidados").onSnapshot((snap) => {
+      for (const ch of snap.docChanges()) {
+        const uid = ch.doc.id;
+        if (ch.type === "removed") { estado.convidados.delete(uid); continue; }
+        if (estado.convidados.has(uid)) continue;
+        estado.convidados.add(uid);
+        ouvirCardsDe(uid);
+      }
+      resolverNomes([...estado.convidados]);
+      atualizarBarra();
+      renderizar();
+    }, () => {});
     const limite = setTimeout(() => {
       if (!estado.carregou) aviso.textContent = "Os dados ainda não chegaram. Se continuar assim, confira a conexão.";
     }, 10000);
@@ -2225,8 +2309,7 @@ dialog textarea { min-height: 90px; resize: vertical; }
       }
       if (!snap.metadata.fromCache) { estado.carregou = true; clearTimeout(limite); }
       sincronizarColab();
-      const colabAqui = !estado.podeEscrever && !!estado.meuId && [...estado.cards.values()].some((c) => paraDe(c).includes(estado.meuId));
-      $("#colab-barra").classList.toggle("hidden", !colabAqui);
+      atualizarBarra();
       renderizar();
     }, () => {
       clearTimeout(limite);
