@@ -1,5 +1,5 @@
 <title>Mural {{PROJETO}}</title>
-<meta name="mural-versao" content="1.4.0">
+<meta name="mural-versao" content="1.4.1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Fredoka:wght@500;600&family=JetBrains+Mono:wght@400;600&display=swap">
@@ -1240,7 +1240,7 @@ dialog textarea { min-height: 90px; resize: vertical; }
     if (texto(c.origem)) partes.push("aberto por " + c.origem);
     if (c.respondidoPor) {
       const rp = String(c.respondidoPor);
-      const quem = rp === estado.meuId ? "você" : rp.startsWith("externo:") ? rp.slice(8) + " (outra organização)" : estado.nomes.get(rp) || "outra pessoa";
+      const quem = rp === estado.meuId ? "você" : estado.nomes.get(rp) || "outra pessoa";
       partes.push("respondido por " + quem);
     }
     if (texto(c.respondidoEm)) partes.push(dataCurta(c.respondidoEm));
@@ -1253,14 +1253,12 @@ dialog textarea { min-height: 90px; resize: vertical; }
 
   // ---------- colaboradores ----------
   function paraDe(c) { return Array.isArray(c.para) ? c.para.filter((x) => typeof x === "string" && x) : []; }
-  function externosDe(c) { return Array.isArray(c.paraExterno) ? c.paraExterno.filter((x) => x && typeof x.nome === "string" && x.nome) : []; }
   // Colaborador = quem não escreve no mural, mas está em "para" deste card.
   function souColab(c) { return !estado.podeEscrever && !!estado.meuId && paraDe(c).includes(estado.meuId); }
   function nomeDe(uid) { return uid === estado.meuId ? "você" : estado.nomes.get(uid) || "colega sem nome visível"; }
   function preencherColab(id, c, no, ehColab, minha) {
     no.colab.replaceChildren();
     const para = paraDe(c);
-    const fora = externosDe(c);
     if (ehColab) {
       const p = document.createElement("div");
       p.className = "para";
@@ -1276,11 +1274,10 @@ dialog textarea { min-height: 90px; resize: vertical; }
       }
       return;
     }
-    if (!estado.podeEscrever || (!para.length && !fora.length)) return;
+    if (!estado.podeEscrever || !para.length) return;
     const p = document.createElement("div");
     p.className = "para";
-    const nomes = para.map(nomeDe).concat(fora.map((e) => e.nome + " (outra organização)"));
-    p.textContent = "Liberado para: " + nomes.join(", ");
+    p.textContent = "Liberado para: " + para.map(nomeDe).join(", ");
     no.colab.append(p);
     for (const uid of para) {
       const r = (estado.respostas.get(uid) || new Map()).get(id);
@@ -1373,7 +1370,7 @@ dialog textarea { min-height: 90px; resize: vertical; }
     lista.className = "lista";
     const dica = document.createElement("div");
     dica.className = "para";
-    dica.textContent = "Quem é de outra organização não escreve no mural: veja a seção da skill sobre colaboradores de fora.";
+    dica.textContent = "Só aparecem colegas da sua organização: quem é de outra organização só lê o mural.";
     const fechar = document.createElement("button");
     fechar.type = "button";
     fechar.className = "link";

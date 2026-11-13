@@ -23,7 +23,7 @@ Faça isso no começo do trabalho e sempre que o usuário colar um aviso como `R
 1. Leia os cards respondidos: `ArtifactData`, `action: "query"`, `collection: "cards"`, `query: {"where": [["status", "==", "respondido"]]}`. Com um ID colado, `action: "get"` com `doc_id`.
 2. Aplique o que foi decidido, só o que é da sua sessão (`origem`/`sessaoId`) ou do seu trabalho. O resto, deixe para a sessão certa.
 3. Feche o card: `ArtifactData`, `action: "update"` (**nunca** `set`, que apaga campos), com o `version` lido no passo 1 como `if_version` e com `{"status": "aplicado", "nota": "<o que foi feito, em uma frase>"}`.
-4. Cards liberados para colaboradores (`para` ou `paraExterno`) podem ter resposta fora do card: veja a seção 8, "Do lado do dono".
+4. Cards liberados para colaboradores (`para`) podem ter resposta fora do card: veja a seção 8, "Do lado do dono".
 
 ## 3. Abrir um card
 1. Escolha o tipo e o próximo ID livre: `ArtifactData`, `action: "list"`, `collection: "cards"`, `query: {"limit": 1000}`, com `out_dir` no scratchpad da sessão. O resultado traz só os IDs e as versões, sem o conteúdo dos cards. Use o maior número daquele prefixo + 1, com 2 dígitos (`P-04`, `T-02`).
@@ -54,8 +54,7 @@ Faça isso no começo do trabalho e sempre que o usuário colar um aviso como `R
   - `resposta`, `comentario`;
   - `status`: `aberto` | `respondido` | `aplicado` | `arquivado`;
   - `nota`, `origem`, `sessaoId?`, `criadoEm` (ISO), `respondidoPor`, `respondidoEm`;
-  - `para?`: [ids de colegas da organização que podem responder este card] (seção 8);
-  - `paraExterno?`: [{`nome`, `mural`}] (colaboradores de outra organização e o mural de respostas de cada um; seção 8).
+  - `para?`: [ids de colegas da organização que podem responder este card] (seção 8).
 - `layout/<ID>`: {`x`, `y`}. Só a página mexe.
 - `grupos/<G-nn>`: grampo (pilha de cards) que o usuário monta na página: {`id`, `titulo`, `ids`: [IDs dos cards, o do topo primeiro], `x`, `y`, `aberto`, `criadoEm`}. **Só a página mexe**: não crie, não edite e não apague grupos. Para a sessão, um card grampeado continua sendo um card normal (lê, aplica e fecha igual). O `titulo` do grupo pode servir de contexto ("estes cards são do tópico X"). Quando o usuário arquiva a pilha inteira, cada card dela vira `status: "arquivado"`.
 - `data/users/<id>/<ID do card>`: resposta do colaborador `<id>`: {`card`, `resposta`, `comentario`, `status`: `respondido` | `aberto`, `respondidoEm`}. Só ele escreve ali; o dono e os editores leem. Quem respondeu é o `<id>` do caminho (a plataforma garante), nunca um campo do documento.
@@ -80,7 +79,7 @@ Faça isso no começo do trabalho e sempre que o usuário colar um aviso como `R
 6. Confira uma vez com `ArtifactData` (`action: "list"`) e entregue o link ao usuário.
 7. Diga que o mural nasce privado e pergunte se mais alguém vai usar. A sessão não compartilha: quem dá acesso é o usuário, no menu **Compartilhar** do mural. Diga qual nível escolher:
    - colega da mesma organização que vai responder cards: **Contributor**;
-   - pessoa de outra organização: **Viewer** (ela responde num mural dela, seção 8 B);
+   - pessoa de outra organização: **Viewer** (só lê: a plataforma não deixa quem é de outra organização responder no mural);
    - **nunca Editor**: Editor republica a página e muda as regras.
    Depois que o usuário compartilhar, siga a seção 8 para liberar os cards.
 
@@ -103,11 +102,10 @@ Cada leitura entra no contexto da sessão. Leia só o necessário:
 - **Checagem agendada** (tarefa que relê o mural) só enquanto espera uma resposta, com intervalo de 15 min ou mais, e apagada ao terminar.
 
 ## 8. Colaboradores (outra pessoa responde cards)
-Um dev de fora da sessão (outra conta no claude.ai) pode ler o mural e responder os cards liberados para ele, sem poder mexer no resto. **Nunca compartilhe como Editor**: Editor republica a página e muda as regras.
+Um colega da **mesma organização** (plano Team ou Enterprise) pode ler o mural e responder os cards liberados para ele, sem poder mexer no resto. **Nunca compartilhe como Editor**: Editor republica a página e muda as regras.
 
-O caminho depende de onde está a conta dele. **Na dúvida, é outra organização**: num plano individual (Pro, Max), toda outra pessoa é de outra organização.
+Pessoa de **outra organização** só lê o mural (Viewer): a plataforma não deixa ela escrever, a não ser como Editor. Num plano individual (Pro, Max), toda outra pessoa é de outra organização.
 
-### A. Colega da mesma organização (plano Team ou Enterprise)
 **Do lado do dono:**
 1. Compartilhe o mural com ele como **Contributor**. O compartilhamento é do usuário (menu Compartilhar), não da sessão.
 2. Libere cada card: na página, **Liberar…** no rodapé do card, e escolha o colega pelo nome. Isso grava o id dele em `para`. A sessão não tem como achar o id de alguém; para liberar um card novo, peça ao usuário, ou copie o `para` de outro card já liberado para a mesma pessoa.
@@ -119,21 +117,6 @@ O caminho depende de onde está a conta dele. **Na dúvida, é outra organizaç�
 2. Os cards dele: `ArtifactData` `action: "query"`, `collection: "cards"`, `query: {"where": [["para", "array-contains", "<id dele>"]]}`. Ele pode ler os outros cards também, para ter contexto.
 3. Para responder: `ArtifactData` `action: "set"`, `collection: "data/users/me"`, `doc_id: "<ID do card>"`, com `{"card": "<ID>", "resposta": "<opção ou texto>", "comentario": "", "status": "respondido", "respondidoEm": "<ISO>"}`. `me` é ele mesmo; ele não escreve em nenhum outro lugar.
 4. Ele não grava em `cards/`, `layout/` nem `grupos/`: a plataforma recusa.
-
-### B. Pessoa de outra organização
-A plataforma não deixa quem é de outra organização escrever no mural, a não ser como Editor. Então ele lê o seu mural e responde **num mural dele**. **Não testado com duas contas reais**: confira no primeiro uso.
-
-**Do lado do dono:**
-1. Compartilhe o mural com ele (Viewer basta: ele só lê).
-2. Ele cria o mural de respostas (abaixo) e manda o link. Marque cada card dele com `update`: `{"paraExterno": [{"nome": "<nome curto>", "mural": "<link do mural dele>"}]}`.
-3. Para ler as respostas: `ArtifactData` `action: "get"`, com o `url` do mural dele, `collection: "respostas"`, `doc_id: "<ID do card>"`. Com resposta, copie para o card como no item 3 de A, com `"respondidoPor": "externo:<nome>"`.
-4. A sua página não mostra as respostas dele (um mural não lê os dados de outro): elas só chegam quando a sessão vai buscar.
-
-**Do lado do colaborador** (o agente dele):
-1. Criar um mural próprio com este plugin (seção 5) e compartilhar com o dono como **Viewer**. Sem o plugin, serve qualquer artefato com a capacidade `db`.
-2. Mandar ao dono o link desse mural.
-3. Ler os cards dele no mural do dono: `ArtifactData` `action: "query"` no `url` do dono, `collection: "cards"`, e ver os que têm o nome dele em `paraExterno`.
-4. Responder **no mural dele**: `ArtifactData` `action: "set"`, `collection: "respostas"`, `doc_id: "<ID do card do dono>"`, com `{"card", "resposta", "comentario", "status": "respondido", "respondidoEm"}`.
 
 ## Limites conhecidos
 - Feito para **desktop**: arrastar, zoom com a roda do mouse, cards arrastados pela faixa do ID.
