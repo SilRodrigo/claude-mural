@@ -15,7 +15,7 @@ Use o mural para o que **pode esperar** (decisões, escolhas, aprovações). O q
 
 ## 1. Achar o mural do projeto
 O link fica na **memória do projeto**: procure em `MEMORY.md` uma linha "Mural …" e o arquivo que ela aponta.
-- **Achou:** use o `url` dele em todas as chamadas do Artifact.
+- **Achou:** use o `url` dele em todas as chamadas do Artifact. Logo em seguida, antes de qualquer outra coisa, compare a versão do mural com a do modelo (seção 6). Se o mural estiver mais antigo, ofereça a atualização ao usuário.
 - **Não achou:** o projeto ainda não tem mural. **Ofereça criar** (seção 5), sem criar por conta própria.
 
 ## 2. Ler e aplicar respostas
