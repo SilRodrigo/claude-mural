@@ -1,5 +1,5 @@
 <title>Mural {{PROJETO}}</title>
-<meta name="mural-versao" content="1.3.0">
+<meta name="mural-versao" content="1.4.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Fredoka:wght@500;600&family=JetBrains+Mono:wght@400;600&display=swap">
@@ -305,6 +305,27 @@ body.sem-selecao, body.sem-selecao * { user-select: none; -webkit-user-select: n
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]):not([data-mural-tema="claro"]) .cmt textarea, :root:not([data-theme="light"]):not([data-mural-tema="claro"]) .copia input { background: rgba(0, 0, 0, 0.18); } }
 .answer-row { display: flex; gap: 6px; }
 .answer-row:empty { display: none; }
+.colab {
+  border-top: 1px dashed var(--note-line);
+  padding-top: 6px;
+  display: grid;
+  gap: 5px;
+  font-size: 12.5px;
+}
+.colab:empty { display: none; }
+.colab .para { font-size: 11.5px; opacity: 0.85; }
+.colab .resp { overflow-wrap: anywhere; white-space: pre-wrap; }
+.colab .resp strong { color: var(--st-sent); }
+.colab .resp button { margin-left: 6px; }
+.colab button.link, .picker button.link { border: 0; background: transparent; text-decoration: underline; font-size: 11.5px; padding: 0; color: var(--note-ink); opacity: 0.8; cursor: pointer; }
+.picker { display: grid; gap: 5px; font-size: 12px; border-top: 1px dashed var(--note-line); padding-top: 6px; }
+.picker input { width: 100%; font: inherit; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--note-line); background: rgba(255, 255, 255, 0.5); color: var(--note-ink); }
+.picker .lista { display: flex; flex-wrap: wrap; gap: 5px; }
+.picker .lista button { font-size: 12px; }
+.picker .chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.picker .chip-para { border: 1px solid var(--note-line); border-radius: 999px; padding: 1px 4px 1px 9px; display: inline-flex; gap: 4px; align-items: center; }
+.picker .chip-para button { border: 0; background: transparent; cursor: pointer; color: var(--note-ink); font-size: 13px; line-height: 1; }
+.colab-barra { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 13px; padding: 6px 16px; background: var(--grupo-bg); border-bottom: 1px solid var(--line, rgba(0,0,0,.08)); }
 .nota {
   border-top: 1px dashed var(--note-line);
   padding-top: 6px;
@@ -546,6 +567,10 @@ dialog textarea { min-height: 90px; resize: vertical; }
   </div>
 </header>
 
+<div class="colab-barra hidden" id="colab-barra" role="note">
+  <span>Você pode responder nos cards marcados <b>“para você”</b>. O resto do mural é só leitura.</span>
+  <button class="btn" type="button" id="colab-instrucoes">Copiar instruções para o seu agente</button>
+</div>
 <main class="viewport" id="viewport" aria-label="Quadro de cards">
   <div class="world" id="world"></div>
   <div class="notice" id="aviso" role="status">Carregando os cards…</div>
@@ -661,6 +686,11 @@ dialog textarea { min-height: 90px; resize: vertical; }
     db: null,
     podeEscrever: true,
     carregou: false,
+    user: null,
+    // Colaboradores: cards.para = [ids de quem pode responder]; cada um responde em data/users/<id>/<card>.
+    respostas: new Map(), // id do colaborador -> Map(card -> resposta)  (só o dono/editores leem)
+    minhas: new Map(),    // card -> a minha resposta de colaborador
+    nomes: new Map(),     // id -> nome (resolvido na hora; nunca gravado)
   };
   const nos = new Map();
   const nosGrupo = new Map();
@@ -1013,6 +1043,10 @@ dialog textarea { min-height: 90px; resize: vertical; }
     cmt.append(cmtLabel, ta);
     const respRow = document.createElement("div");
     respRow.className = "answer-row";
+    const colab = document.createElement("div");
+    colab.className = "colab";
+    const picker = document.createElement("div");
+    picker.className = "picker hidden";
     const nota = document.createElement("div");
     nota.className = "nota";
     const copia = document.createElement("div");
@@ -1035,9 +1069,15 @@ dialog textarea { min-height: 90px; resize: vertical; }
     tirar.type = "button";
     tirar.className = "link hidden";
     tirar.textContent = "Tirar do grampo";
-    acoes.append(avisar, tirar, arq);
+    const liberar = document.createElement("button");
+    liberar.type = "button";
+    liberar.className = "link";
+    liberar.textContent = "Liberar…";
+    liberar.title = "Escolher colegas da organização que podem responder este card";
+    acoes.append(avisar, liberar, tirar, arq);
     foot.append(meta, acoes);
-    raiz.append(head, titulo, ctx, code, opts, itens, cmt, respRow, nota, copia, foot);
+    raiz.append(head, titulo, ctx, code, opts, itens, cmt, respRow, colab, picker, nota, copia, foot);
+    liberar.addEventListener("click", () => alternarPicker(id));
     avisar.addEventListener("click", () => copiarAviso(id));
     world.append(raiz);
 
@@ -1045,7 +1085,21 @@ dialog textarea { min-height: 90px; resize: vertical; }
     const gravarComentario = () => {
       clearTimeout(salvarCmt);
       const atual = estado.cards.get(id);
-      if (!atual || (atual.comentario || "") === ta.value) return;
+      if (!atual) return;
+      if (souColab(atual)) {
+        const minha = estado.minhas.get(id) || {};
+        if ((minha.comentario || "") === ta.value) return;
+        const dados = { comentario: ta.value };
+        const temOp = Array.isArray(atual.opcoes) && atual.opcoes.some((o) => typeof o === "string" && o);
+        if (!temOp && minha.status === "respondido") {
+          const txt = ta.value.trim();
+          if (txt) dados.resposta = txt;
+          else Object.assign(dados, { status: "aberto", resposta: null, respondidoEm: null });
+        }
+        gravarMinha(id, dados);
+        return;
+      }
+      if ((atual.comentario || "") === ta.value) return;
       const dados = { comentario: ta.value };
       // Card sem opções já enviado: a resposta é o próprio comentário, então acompanha a correção.
       const temOpcoes = Array.isArray(atual.opcoes) && atual.opcoes.some((o) => typeof o === "string" && o);
@@ -1087,7 +1141,7 @@ dialog textarea { min-height: 90px; resize: vertical; }
       arrastar(e, head, g && !g.aberto ? { grupo: gid } : { card: id }, noId ? () => copiarId(id) : null);
     });
 
-    const no = { raiz, cid, pill, titulo, ctx, code, opts, itens, ta, respRow, nota, copia, meta, avisar, arq, tirar, selbtn, altura: 0, camada: 0, assinatura: "" };
+    const no = { raiz, cid, pill, titulo, ctx, code, opts, itens, ta, respRow, colab, picker, liberar, nota, copia, meta, avisar, arq, tirar, selbtn, altura: 0, camada: 0, assinatura: "" };
     nos.set(id, no);
     return no;
   }
@@ -1113,14 +1167,17 @@ dialog textarea { min-height: 90px; resize: vertical; }
     no.code.textContent = codigo;
     no.code.classList.toggle("hidden", !codigo);
 
+    const ehColab = souColab(c);
+    const minha = estado.minhas.get(id) || null;
     const opcoes = Array.isArray(c.opcoes) ? c.opcoes.filter((o) => typeof o === "string" && o) : [];
     no.opts.replaceChildren(...opcoes.map((o) => {
       const b = document.createElement("button");
       b.type = "button";
       b.className = "opt";
       b.textContent = o;
-      b.setAttribute("aria-pressed", String(c.resposta === o));
-      b.addEventListener("click", () => responder(id, o));
+      b.setAttribute("aria-pressed", String(ehColab ? !!minha && minha.resposta === o : c.resposta === o));
+      b.disabled = !estado.podeEscrever && !ehColab;
+      b.addEventListener("click", () => (ehColab ? responderColab(id, o) : responder(id, o)));
       return b;
     }));
 
@@ -1131,6 +1188,7 @@ dialog textarea { min-height: 90px; resize: vertical; }
       cb.type = "checkbox";
       cb.id = `item-${id}-${i}`;
       cb.checked = !!(item && item.feito);
+      cb.disabled = !estado.podeEscrever;
       const sp = document.createElement("span");
       sp.textContent = texto(item && item.texto);
       lab.htmlFor = cb.id;
@@ -1141,10 +1199,19 @@ dialog textarea { min-height: 90px; resize: vertical; }
       return li;
     }));
 
-    if (document.activeElement !== no.ta) no.ta.value = texto(c.comentario);
+    if (document.activeElement !== no.ta) no.ta.value = ehColab ? texto(minha && minha.comentario) : texto(c.comentario);
 
     no.respRow.replaceChildren();
-    if (!opcoes.length && tipo !== "T" && (status === "aberto" || status === "respondido")) {
+    if (ehColab && !opcoes.length && tipo !== "T" && status !== "arquivado") {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "opt";
+      const enviado = !!minha && minha.status === "respondido";
+      b.textContent = enviado ? "Desfazer envio" : "Enviar comentário como resposta";
+      b.setAttribute("aria-pressed", String(enviado));
+      b.addEventListener("click", () => enviarComentarioColab(id, enviado));
+      no.respRow.append(b);
+    } else if (estado.podeEscrever && !opcoes.length && tipo !== "T" && (status === "aberto" || status === "respondido")) {
       const b = document.createElement("button");
       b.type = "button";
       b.className = "opt";
@@ -1154,6 +1221,7 @@ dialog textarea { min-height: 90px; resize: vertical; }
       b.addEventListener("click", () => enviarComentario(id, enviado));
       no.respRow.append(b);
     }
+    preencherColab(id, c, no, ehColab, minha);
 
     const notaTexto = texto(c.nota);
     no.nota.replaceChildren();
@@ -1164,17 +1232,233 @@ dialog textarea { min-height: 90px; resize: vertical; }
     }
     no.nota.classList.toggle("hidden", !notaTexto);
 
-    no.avisar.classList.toggle("hidden", status !== "respondido");
+    no.avisar.classList.toggle("hidden", status !== "respondido" || !estado.podeEscrever);
+    no.liberar.classList.toggle("hidden", !estado.podeEscrever || !estado.user);
     if (status !== "respondido") no.copia.classList.add("hidden");
 
     const partes = [];
     if (texto(c.origem)) partes.push("aberto por " + c.origem);
-    if (c.respondidoPor) partes.push(c.respondidoPor === estado.meuId ? "respondido por você" : "respondido por outra pessoa");
+    if (c.respondidoPor) {
+      const rp = String(c.respondidoPor);
+      const quem = rp === estado.meuId ? "você" : rp.startsWith("externo:") ? rp.slice(8) + " (outra organização)" : estado.nomes.get(rp) || "outra pessoa";
+      partes.push("respondido por " + quem);
+    }
     if (texto(c.respondidoEm)) partes.push(dataCurta(c.respondidoEm));
     no.meta.textContent = partes.join(" · ");
     no.arq.textContent = status === "arquivado" ? "Desarquivar" : "Arquivar";
     no.arq.disabled = !estado.podeEscrever;
-    no.ta.readOnly = !estado.podeEscrever;
+    no.arq.classList.toggle("hidden", !estado.podeEscrever);
+    no.ta.readOnly = !estado.podeEscrever && !ehColab;
+  }
+
+  // ---------- colaboradores ----------
+  function paraDe(c) { return Array.isArray(c.para) ? c.para.filter((x) => typeof x === "string" && x) : []; }
+  function externosDe(c) { return Array.isArray(c.paraExterno) ? c.paraExterno.filter((x) => x && typeof x.nome === "string" && x.nome) : []; }
+  // Colaborador = quem não escreve no mural, mas está em "para" deste card.
+  function souColab(c) { return !estado.podeEscrever && !!estado.meuId && paraDe(c).includes(estado.meuId); }
+  function nomeDe(uid) { return uid === estado.meuId ? "você" : estado.nomes.get(uid) || "colega sem nome visível"; }
+  function preencherColab(id, c, no, ehColab, minha) {
+    no.colab.replaceChildren();
+    const para = paraDe(c);
+    const fora = externosDe(c);
+    if (ehColab) {
+      const p = document.createElement("div");
+      p.className = "para";
+      p.textContent = "Liberado para você responder.";
+      no.colab.append(p);
+      if (minha && minha.status === "respondido") {
+        const r = document.createElement("div");
+        r.className = "resp";
+        const s = document.createElement("strong");
+        s.textContent = "Sua resposta: ";
+        r.append(s, document.createTextNode(texto(minha.resposta) + (minha.respondidoEm ? " · " + dataCurta(minha.respondidoEm) : "")));
+        no.colab.append(r);
+      }
+      return;
+    }
+    if (!estado.podeEscrever || (!para.length && !fora.length)) return;
+    const p = document.createElement("div");
+    p.className = "para";
+    const nomes = para.map(nomeDe).concat(fora.map((e) => e.nome + " (outra organização)"));
+    p.textContent = "Liberado para: " + nomes.join(", ");
+    no.colab.append(p);
+    for (const uid of para) {
+      const r = (estado.respostas.get(uid) || new Map()).get(id);
+      if (!r || r.status !== "respondido") continue;
+      const linha = document.createElement("div");
+      linha.className = "resp";
+      const s = document.createElement("strong");
+      s.textContent = nomeDe(uid) + ": ";
+      let corpo = texto(r.resposta);
+      if (texto(r.comentario) && texto(r.comentario) !== corpo) corpo += " — " + texto(r.comentario);
+      linha.append(s, document.createTextNode(corpo));
+      const ja = c.respondidoPor === uid && c.resposta === r.resposta;
+      if (!ja) {
+        const usar = document.createElement("button");
+        usar.type = "button";
+        usar.className = "link";
+        usar.textContent = "Usar esta resposta";
+        usar.title = "Copia a resposta para o card, como se você tivesse respondido, marcando quem respondeu";
+        usar.addEventListener("click", () => usarResposta(id, uid));
+        linha.append(usar);
+      }
+      no.colab.append(linha);
+    }
+  }
+  function usarResposta(id, uid) {
+    const c = estado.cards.get(id);
+    const r = (estado.respostas.get(uid) || new Map()).get(id);
+    if (!c || !r) return;
+    const dados = { resposta: texto(r.resposta) || texto(r.comentario), status: "respondido", respondidoPor: uid, respondidoEm: texto(r.respondidoEm) || new Date().toISOString() };
+    if (!texto(c.comentario) && texto(r.comentario)) dados.comentario = r.comentario;
+    atualizarCard(id, dados);
+  }
+  // Resposta do colaborador: data/users/<meu id>/<card>. Só ele escreve ali; o dono e editores leem.
+  function gravarMinha(id, dados) {
+    if (!estado.db || !estado.meuId) return;
+    const novo = Object.assign({}, estado.minhas.get(id) || {}, dados, { card: id });
+    estado.minhas.set(id, novo);
+    renderizar();
+    const ref = estado.db.collection("data/users/" + estado.meuId).doc(id);
+    escrever("data/users/" + estado.meuId + "/" + id, () => ref.set(novo));
+  }
+  function responderColab(id, opcao) {
+    const minha = estado.minhas.get(id);
+    if (minha && minha.resposta === opcao && minha.status === "respondido") gravarMinha(id, { resposta: null, status: "aberto", respondidoEm: null });
+    else gravarMinha(id, { resposta: opcao, status: "respondido", respondidoEm: new Date().toISOString() });
+  }
+  function enviarComentarioColab(id, desfazer) {
+    const no = nos.get(id);
+    if (!no) return;
+    if (desfazer) { gravarMinha(id, { status: "aberto", resposta: null, respondidoEm: null }); return; }
+    const txt = no.ta.value.trim();
+    if (!txt) { toast("Escreva o comentário antes de enviar."); no.ta.focus(); return; }
+    gravarMinha(id, { comentario: no.ta.value, resposta: txt, status: "respondido", respondidoEm: new Date().toISOString() });
+  }
+  // Escolher quem pode responder (só colegas da organização: quem é de fora não escreve no mural).
+  function alternarPicker(id) {
+    const no = nos.get(id);
+    if (!no) return;
+    if (!no.picker.classList.contains("hidden")) { no.picker.classList.add("hidden"); no.picker.replaceChildren(); renderizar(); return; }
+    no.picker.classList.remove("hidden");
+    montarPicker(id, no);
+    renderizar();
+  }
+  function montarPicker(id, no) {
+    const c = estado.cards.get(id) || {};
+    const chips = document.createElement("div");
+    chips.className = "chips";
+    for (const uid of paraDe(c)) {
+      const ch = document.createElement("span");
+      ch.className = "chip-para";
+      ch.append(document.createTextNode(nomeDe(uid)));
+      const x = document.createElement("button");
+      x.type = "button";
+      x.textContent = "×";
+      x.setAttribute("aria-label", "Tirar " + nomeDe(uid));
+      x.addEventListener("click", () => {
+        const atual = estado.cards.get(id) || {};
+        atualizarCard(id, { para: paraDe(atual).filter((u) => u !== uid) });
+        no.picker.replaceChildren();
+        montarPicker(id, no);
+      });
+      ch.append(x);
+      chips.append(ch);
+    }
+    const campo = document.createElement("input");
+    campo.type = "search";
+    campo.placeholder = "Nome de um colega da organização";
+    campo.setAttribute("aria-label", "Buscar colega para liberar este card");
+    const lista = document.createElement("div");
+    lista.className = "lista";
+    const dica = document.createElement("div");
+    dica.className = "para";
+    dica.textContent = "Quem é de outra organização não escreve no mural: veja a seção da skill sobre colaboradores de fora.";
+    const fechar = document.createElement("button");
+    fechar.type = "button";
+    fechar.className = "link";
+    fechar.textContent = "Fechar";
+    fechar.addEventListener("click", () => alternarPicker(id));
+    const buscar = async () => {
+      if (!estado.user) return;
+      const hits = await estado.user.search(campo.value);
+      const ja = new Set(paraDe(estado.cards.get(id) || {}));
+      lista.replaceChildren(...hits.filter((h) => !h.isMe && !ja.has(h.id)).map((h) => {
+        estado.nomes.set(h.id, h.name);
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "opt";
+        b.textContent = h.name;
+        b.addEventListener("click", () => {
+          const atual = estado.cards.get(id) || {};
+          atualizarCard(id, { para: [...new Set([...paraDe(atual), h.id])] });
+          sincronizarColab();
+          no.picker.replaceChildren();
+          montarPicker(id, no);
+        });
+        return b;
+      }));
+      if (campo.value && !lista.children.length) lista.textContent = "Ninguém encontrado na sua organização.";
+    };
+    campo.addEventListener("input", buscar);
+    campo.addEventListener("focus", buscar);
+    no.picker.append(chips, campo, lista, dica, fechar);
+    setTimeout(() => campo.focus(), 0);
+  }
+  // Assinaturas: o dono ouve as respostas de cada colaborador citado em "para"; o colaborador ouve as próprias.
+  const ouvindo = new Set();
+  function sincronizarColab() {
+    const db = estado.db;
+    if (!db) return;
+    if (estado.podeEscrever) {
+      const ids = new Set();
+      for (const c of estado.cards.values()) for (const uid of paraDe(c)) ids.add(uid);
+      for (const uid of ids) {
+        if (ouvindo.has(uid) || ouvindo.size >= 50) continue;
+        ouvindo.add(uid);
+        db.collection("data/users/" + uid).onSnapshot((snap) => {
+          const m = estado.respostas.get(uid) || new Map();
+          for (const ch of snap.docChanges()) {
+            if (ch.type === "removed") m.delete(ch.doc.id);
+            else m.set(ch.doc.id, ch.doc.data() || {});
+          }
+          estado.respostas.set(uid, m);
+          renderizar();
+        }, () => {});
+      }
+      resolverNomes([...ids, ...[...estado.cards.values()].map((c) => c.respondidoPor).filter((x) => typeof x === "string" && x)]);
+    } else if (estado.meuId && !ouvindo.has(estado.meuId) && [...estado.cards.values()].some((c) => paraDe(c).includes(estado.meuId))) {
+      ouvindo.add(estado.meuId);
+      db.collection("data/users/" + estado.meuId).onSnapshot((snap) => {
+        for (const ch of snap.docChanges()) {
+          if (ch.type === "removed") estado.minhas.delete(ch.doc.id);
+          else estado.minhas.set(ch.doc.id, ch.doc.data() || {});
+        }
+        renderizar();
+      }, () => {});
+    }
+  }
+  let nomesPendentes = false;
+  async function resolverNomes(ids) {
+    if (!estado.user || !ids.length || nomesPendentes) return;
+    const faltam = ids.filter((u) => !estado.nomes.has(u));
+    if (!faltam.length) return;
+    nomesPendentes = true;
+    try {
+      const ps = await estado.user.profiles(faltam);
+      for (const u of faltam) estado.nomes.set(u, (ps[u] && ps[u].name) || "");
+    } catch (_) {}
+    nomesPendentes = false;
+    renderizar();
+  }
+  function textoInstrucoes() {
+    return [
+      "Mural de outra pessoa, compartilhado comigo. Protocolo (skill mural, seção 8 \"Colaborador\"):",
+      `- Meu id neste mural: ${estado.meuId}`,
+      `- Meus cards: ArtifactData action "query", collection "cards", query {"where": [["para", "array-contains", "${estado.meuId}"]]}.`,
+      "- Responder: ArtifactData action \"set\", collection \"data/users/me\", doc_id \"<ID do card>\", com {\"card\": \"<ID>\", \"resposta\": \"<texto ou opção>\", \"comentario\": \"\", \"status\": \"respondido\", \"respondidoEm\": \"<ISO>\"}.",
+      "- Não escrevo em cards/, layout/ ou grupos/ (são do dono). O progresso aparece nos itens do card.",
+    ].join("\n");
   }
 
   function dataCurta(iso) {
@@ -1280,7 +1564,8 @@ dialog textarea { min-height: 90px; resize: vertical; }
     const soltos = [];
     for (const [id, c] of estado.cards) {
       const no = nos.get(id) || criarNo(id);
-      const assinatura = JSON.stringify([c, estado.meuId, estado.podeEscrever]);
+      const resp = paraDe(c).map((u) => [u, (estado.respostas.get(u) || new Map()).get(id) || null, estado.nomes.get(u) || ""]);
+      const assinatura = JSON.stringify([c, estado.meuId, estado.podeEscrever, estado.minhas.get(id) || null, resp, estado.nomes.get(c.respondidoPor) || ""]);
       if (assinatura !== no.assinatura) { preencherNo(id, c, no); no.assinatura = assinatura; }
       const status = statusDe(c);
       contagem[status]++;
@@ -1722,6 +2007,7 @@ dialog textarea { min-height: 90px; resize: vertical; }
       els.forEach((el) => el.classList.remove("arrastando"));
       if (ev.type === "pointercancel") { renderizar(); return; }
       if (!a.moveu) { if (aoClicar) aoClicar(); return; }
+      if (!estado.podeEscrever) { renderizar(); return; } // só leitura: o card volta para o lugar
       soltarEm(ent, alvo, Math.round(inicio[0][0] + a.dx), Math.round(inicio[0][1] + a.dy));
     };
     alca.addEventListener("pointermove", mover);
@@ -1908,6 +2194,11 @@ dialog textarea { min-height: 90px; resize: vertical; }
     toastTimer = setTimeout(() => toastEl.classList.add("hidden"), opc ? 10000 : 3200);
   }
 
+  $("#colab-instrucoes").addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(textoInstrucoes()); toast("Instruções copiadas. Cole no chat do seu agente."); }
+    catch (_) { toast("Não consegui copiar. Tente de novo."); }
+  });
+
   // ---------- conexão ----------
   aplicarVisao();
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => renderizar());
@@ -1922,9 +2213,11 @@ dialog textarea { min-height: 90px; resize: vertical; }
     }
     estado.db = db;
     if (user) {
+      estado.user = user;
       try { estado.meuId = await user.id(); } catch (_) {}
       try { const pode = await user.can("data.write"); if (pode === false) estado.podeEscrever = false; } catch (_) {}
     }
+    if (!estado.podeEscrever) $("#abrir-novo").classList.add("hidden");
     const limite = setTimeout(() => {
       if (!estado.carregou) aviso.textContent = "Os dados ainda não chegaram. Se continuar assim, confira a conexão.";
     }, 10000);
@@ -1934,6 +2227,9 @@ dialog textarea { min-height: 90px; resize: vertical; }
         else estado.cards.set(ch.doc.id, ch.doc.data() || {});
       }
       if (!snap.metadata.fromCache) { estado.carregou = true; clearTimeout(limite); }
+      sincronizarColab();
+      const colabAqui = !estado.podeEscrever && !!estado.meuId && [...estado.cards.values()].some((c) => paraDe(c).includes(estado.meuId));
+      $("#colab-barra").classList.toggle("hidden", !colabAqui);
       renderizar();
     }, () => {
       clearTimeout(limite);
