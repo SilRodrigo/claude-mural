@@ -1,5 +1,5 @@
 <title>Mural {{PROJETO}}</title>
-<meta name="mural-versao" content="1.5.0">
+<meta name="mural-versao" content="1.5.1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Fredoka:wght@500;600&family=JetBrains+Mono:wght@400;600&display=swap">
@@ -217,6 +217,7 @@ body.sem-selecao, body.sem-selecao * { user-select: none; -webkit-user-select: n
   flex-direction: column;
   gap: 8px;
   padding: 0 12px 10px;
+  overflow-wrap: anywhere;
   cursor: default;
 }
 .card.t-A { background: var(--note-A); }
@@ -285,6 +286,7 @@ body.sem-selecao, body.sem-selecao * { user-select: none; -webkit-user-select: n
 .items { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .items:empty { display: none; }
 .items label { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; cursor: pointer; }
+.items label span { min-width: 0; }
 .items input { margin-top: 3px; accent-color: var(--st-done); }
 .items .done span { text-decoration: line-through; opacity: 0.7; }
 .cmt { display: grid; gap: 3px; }
